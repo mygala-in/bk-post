@@ -1,5 +1,5 @@
 {
-  "name": "bk-timeline",
+  "name": "mygala-bk-timeline",
   "version": "1.0.0",
   "description": "manage timeline for mygala users, marriages, etc.",
   "main": "timelineHandler.js",

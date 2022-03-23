@@ -1,5 +1,5 @@
 service: mygala-bk-timeline
-frameworkVersion: '3.7.3'
+frameworkVersion: '3.8.0'
 variablesResolutionMode: 20210326
 configValidationMode: error
 
