@@ -1,0 +1,12 @@
+# package directories
+node_modules
+jspm_packages
+
+# Serverless directories
+.serverless
+package-lock.json
+rpay.html
+
+.DS_Store
+*.DS_Store
+test.js

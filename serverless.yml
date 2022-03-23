@@ -1,0 +1,80 @@
+service: mygala-bk-timeline
+frameworkVersion: '3.7.3'
+variablesResolutionMode: 20210326
+configValidationMode: error
+
+plugins:
+  - serverless-offline
+  - serverless-prune-plugin
+  - serverless-domain-manager
+
+custom:
+  prune:
+    automatic: true
+    includeLayers: true
+    number: 2
+  serverless-offline:
+    noPrependStageInUrl: true
+  config: ${file(./bk-config/config.${self:provider.stage}.json)}
+  domains:
+    prod: api.mygala.in
+    dev: dev-api.mygala.in
+  customDomain:
+    # Ex: serverless create_domain --stage dev
+    domainName: ${self:custom.domains.${self:provider.stage}}
+    basePath: 'timeline' # indication of backend service
+    stage: ${self:provider.stage}
+    createRoute53Record: false
+  customCors:
+    origin: '*'
+    headers:
+      - platform
+      - appversion
+      - Content-Type
+      - X-Amz-Date
+      - Authorization
+      - X-Api-Key
+      - X-Amz-Security-Token
+      - X-Amz-User-Agent
+    allowCredentials: false
+
+provider:
+  name: aws
+  timeout: 12
+  runtime: nodejs14.x
+  region: ap-south-1
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role: ${self:custom.config.lambdaRole}
+  vpc:
+    securityGroupIds:
+      - ${self:custom.config.securityGroup}
+    subnetIds:
+      - ${self:custom.config.subnet1}
+      - ${self:custom.config.subnet2}
+      - ${self:custom.config.subnet3}
+  endpointType: REGIONAL
+  lambdaHashingVersion: '20201221'
+  deploymentBucket: ${self:provider.stage}-mygala-sls-deployments
+  environment:
+    stage: ${self:provider.stage}
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    awsRegion: ${self:custom.config.awsRegion}
+    envPrefix: ${self:custom.config.envPrefix}
+
+functions:
+  timeline-events:
+    name: ${self:custom.config.envPrefix}-timeline-events
+    handler: timelineHandler.invoke
+    events:
+      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline-events
+
+resources:
+  Conditions:
+    isProd: {"Fn::Equals" : ["${self:provider.stage}", "prod"]}
+    isDev: {"Fn::Equals" : ["${self:provider.stage}", "dev"]}
+  Resources:
+    TimelineSNS:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:custom.config.envPrefix}-timeline-events
