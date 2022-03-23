@@ -14,5 +14,15 @@
     "url": "git@github.com-personal:gala-in/bk-timeline.git"
   },
   "author": "ksAvinash",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "aws-sdk": "^2.925.0",
+    "eslint": "^7.30.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.23.4",
+    "serverless": "^3.7.3",
+    "serverless-domain-manager": "^5.1.0",
+    "serverless-offline": "^7.0.0",
+    "serverless-prune-plugin": "^1.5.0"
+  }
 }
