@@ -6,7 +6,7 @@ configValidationMode: error
 plugins:
   - serverless-offline
   - serverless-prune-plugin
-  - serverless-domain-manager
+  # - serverless-domain-manager
 
 custom:
   prune:
@@ -61,6 +61,13 @@ provider:
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
     awsRegion: ${self:custom.config.awsRegion}
     envPrefix: ${self:custom.config.envPrefix}
+    awsAccountId: ${self:custom.config.awsAccountId}
+    redisHost: ${self:custom.config.redisHost}
+    redisPort: ${self:custom.config.redisPort}
+    redisPassword: ${self:custom.config.redisPassword}
+    rdsArn: ${self:custom.config.rdsArn}
+    rdsDatabase: ${self:custom.config.rdsDatabase}
+    rdsSecretArn: ${self:custom.config.rdsSecretArn}
 
 functions:
   timeline-events:
