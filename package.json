@@ -24,5 +24,8 @@
     "serverless-domain-manager": "^5.1.0",
     "serverless-offline": "^7.0.0",
     "serverless-prune-plugin": "^1.5.0"
+  },
+  "dependencies": {
+    "underscore": "^1.13.2"
   }
 }

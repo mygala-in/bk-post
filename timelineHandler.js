@@ -1,62 +1,52 @@
-/* eslint-disable no-await-in-loop */
+const _ = require('underscore');
 const logger = require('./bk-utils/logger');
+const errors = require('./bk-utils/errors');
+const access = require('./bk-utils/access');
 const redis = require('./bk-utils/redis.helper');
-const constants = require('./bk-utils/constants');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
-const rdsUsers = require('./bk-utils/rds/rds.users.helper');
-const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS } = constants;
 
-async function savePost(message) {
-  logger.info('saving post');
-  const { type, userId, marriageId, assetType, resourceType } = message;
-  let user;
-  let insertId;
-
-  switch (type) {
-    case 'marriage.join':
-      user = await rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS);
-      ({ insertId } = await rdsPosts.insertPost({ type, userId, marriageId, assetType, resourceType, url: user.photo, meta: JSON.stringify(user) }));
-      await rdsPosts.getPost(insertId);
-      break;
-
-    case 'marriage.remove':
-      break;
-
-    default:
+async function getTimeline(request) {
+  const { decoded } = request;
+  const { postId, size } = request.queryStringParameters;
+  const key = `user_${decoded.id}_timeline`;
+  const exists = await redis.exists(key);
+  if (!exists) {
+    // TODO - re-generate user timeline
   }
-  return insertId;
+  const [total, rank] = await Promise.all([redis.zcard(key), redis.zrank(key, postId)]);
+  const resp = { entity: 'collection', items: [], count: 0, total };
+  if (total === 0) return resp;
+
+  const ids = await redis.zrange(key, 'int', rank + 1, rank + size > 100 ? 20 : size);
+  logger.info('user timeline post ids', ids);
+  const posts = await rdsPosts.getPostsIn(ids);
+
+  resp.items = _.sortBy(posts.items, 'id');
+  resp.count = resp.items.count;
+  return resp;
 }
 
 
-async function updateTimeline(id, message) {
-  const { marriageId } = message;
-  logger.info('updating user timelines');
-  const mUsers = await rdsMUsers.getUsers(marriageId);
-  const ids = mUsers.items.map((user) => user.userId);
-  logger.info('total marriage users ', ids.length);
-  for (let i = 0; i < ids.length; i += 1) {
-    const key = `user_${ids[i]}_timeline`;
-    const exists = await redis.exists(key);
-    if (exists) {
-      await redis.zadd(key, id, id);
-      // await redis.expire(key, REDIS_CONFIG.timeline.user);
-    } else logger.info('skipping timeline update for ', key);
-  }
-}
-
-
-async function invoke(request) {
-  logger.info('received timeline event');
-  logger.info(JSON.stringify(request));
+async function invoke(event, context, callback) {
+  const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials': true };
   try {
-    const message = JSON.parse(request.Records[0].Sns.Message);
-    logger.info(message);
-    const id = await savePost(message);
-    await updateTimeline(id, message);
+    const request = access.validateRequest(event, context);
+
+    let resp = {};
+    switch (request.resourcePath) {
+      case '/v1/list':
+        resp = await getTimeline(request);
+        break;
+      default: errors.handleError(400, 'invalid request path');
+    }
+    context.callbackWaitsForEmptyEventLoop = false;
+    return callback(null, { statusCode: 200, headers, body: JSON.stringify(resp) });
   } catch (err) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    logger.error('error processing api');
     logger.error(err);
+    return callback(null, { headers, ...err });
   }
 }
 

@@ -6,7 +6,7 @@ configValidationMode: error
 plugins:
   - serverless-offline
   - serverless-prune-plugin
-  # - serverless-domain-manager
+  - serverless-domain-manager
 
 custom:
   prune:
@@ -19,12 +19,12 @@ custom:
   domains:
     prod: api.mygala.in
     dev: dev-api.mygala.in
-  # customDomain:
-  #   # Ex: serverless create_domain --stage dev
-  #   domainName: ${self:custom.domains.${self:provider.stage}}
-  #   basePath: 'timeline' # indication of backend service
-  #   stage: ${self:provider.stage}
-  #   createRoute53Record: false
+  customDomain:
+    # Ex: serverless create_domain --stage dev
+    domainName: ${self:custom.domains.${self:provider.stage}}
+    basePath: 'timeline' # indication of backend service
+    stage: ${self:provider.stage}
+    createRoute53Record: false
   customCors:
     origin: '*'
     headers:
@@ -62,6 +62,7 @@ provider:
     awsRegion: ${self:custom.config.awsRegion}
     envPrefix: ${self:custom.config.envPrefix}
     awsAccountId: ${self:custom.config.awsAccountId}
+    jwtSecretKey: ${self:custom.config.jwtSecretKey}
     redisHost: ${self:custom.config.redisHost}
     redisPort: ${self:custom.config.redisPort}
     redisPassword: ${self:custom.config.redisPassword}
@@ -72,9 +73,17 @@ provider:
 functions:
   timeline-events:
     name: ${self:custom.config.envPrefix}-timeline-events
-    handler: timelineHandler.invoke
+    handler: processor.sns
     events:
       - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline-events
+  timeline-apis:
+    name: ${self:custom.config.envPrefix}-timeline-apis
+    handler: timelineHandler.invoke
+    events:
+      - http:
+          path: /v1/list
+          method: any
+          cors: ${self:custom.customCors}
 
 resources:
   Conditions:
