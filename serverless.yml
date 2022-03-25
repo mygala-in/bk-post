@@ -75,7 +75,7 @@ functions:
     name: ${self:custom.config.envPrefix}-timeline-events
     handler: processor.sns
     events:
-      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline-events
+      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline
   timeline-apis:
     name: ${self:custom.config.envPrefix}-timeline-apis
     handler: timelineHandler.invoke
@@ -93,4 +93,4 @@ resources:
     TimelineSNS:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: ${self:custom.config.envPrefix}-timeline-events
+        TopicName: ${self:custom.config.envPrefix}-timeline
