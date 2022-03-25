@@ -1,4 +1,3 @@
-const _ = require('underscore');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const access = require('./bk-utils/access');
@@ -14,16 +13,18 @@ async function getTimeline(request) {
   if (!exists) {
     // TODO - re-generate user timeline
   }
-  const [total, rank] = await Promise.all([redis.zcard(key), redis.zrank(key, postId)]);
-  const resp = { entity: 'collection', items: [], count: 0, total };
+  let [total, rank] = await Promise.all([redis.zcard(key), redis.zrank(key, postId)]);
+  rank = rank || 0;
+  total = total || 0;
+  logger.info({ total, postId, rank });
+  let resp = { entity: 'collection', items: [], count: 0, total };
   if (total === 0) return resp;
 
-  const ids = await redis.zrange(key, 'int', rank + 1, rank + size > 100 ? 20 : size);
+  const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
-  const posts = await rdsPosts.getPostsIn(ids);
 
-  resp.items = _.sortBy(posts.items, 'id');
-  resp.count = resp.items.count;
+  resp = await rdsPosts.getPostsIn(ids);
+  resp.total = total;
   return resp;
 }
 
