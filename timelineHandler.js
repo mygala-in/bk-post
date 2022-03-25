@@ -1,3 +1,4 @@
+const processor = require('./processor');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const access = require('./bk-utils/access');
@@ -10,9 +11,8 @@ async function getTimeline(request) {
   const { postId, size } = request.queryStringParameters;
   const key = `user_${decoded.id}_timeline`;
   const exists = await redis.exists(key);
-  if (!exists) {
-    // TODO - re-generate user timeline
-  }
+  if (!exists) await processor.generateTimeline(decoded.id);
+
   let [total, rank] = await Promise.all([redis.zcard(key), redis.zrank(key, postId)]);
   rank = rank || 0;
   total = total || 0;

@@ -7,6 +7,7 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
 const { MINI_PROFILE_FIELDS } = constants;
+const { STATUS } = constants.MARRIAGE_CONFIG;
 
 async function savePost(message) {
   logger.info('saving post');
@@ -47,6 +48,23 @@ async function updateTimeline(id, message) {
   }
 }
 
+async function generateTimeline(userId) {
+  logger.info('started generating timeline for user ', userId);
+  const mJoins = await rdsMUsers.getMarriages(userId);
+  const vIds = mJoins.items.filter((i) => i.status === STATUS.verified).map((i) => i.marriageId);
+  logger.info('verified marriage ids ', vIds);
+
+  const postIds = await rdsPosts.getMarriagePostIds(vIds);
+  logger.info('total posts ', postIds.count);
+  const tasks = [];
+  for (let i = 0; i < postIds.count; i += 1) {
+    const id = postIds.items[i];
+    tasks.push(redis.zadd(`user_${userId}_timeline`, id, id));
+  }
+  await Promise.all(tasks);
+  logger.info('completed generating timeline for user');
+}
+
 
 async function sns(request) {
   logger.info('received timeline event sns');
@@ -61,6 +79,8 @@ async function sns(request) {
   }
 }
 
+
 module.exports = {
   sns,
+  generateTimeline,
 };
