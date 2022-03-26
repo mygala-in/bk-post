@@ -31,18 +31,38 @@ async function savePost(message) {
       await rdsPosts.getPost(insertId);
       break;
 
-    case 'marriage.remove':
-      break;
-
     default:
+      logger.warn(`unhandled post type ${type}`);
   }
   return insertId;
 }
 
 
-async function addToTimelines(id, message) {
+async function removePost(message) {
+  logger.info('removing post');
+  const { type } = message;
+
+  let postId;
+  switch (type) {
+    case 'marriage.join':
+      postId = await rdsPosts.queryPost(message);
+      break;
+
+    case 'marriage.post':
+      ({ postId } = message.postId);
+      break;
+
+    default:
+  }
+  await rdsPosts.deletePost(postId);
+  return postId;
+}
+
+
+
+async function addToTimelines(postId, message) {
   const { marriageId } = message;
-  logger.info('adding post to user timelines');
+  logger.info('adding post to user timelines ', postId, JSON.stringify(message));
   const mUsers = await rdsMUsers.getUsers(marriageId);
   const ids = mUsers.items.map((user) => user.userId);
   logger.info('total marriage users ', ids.length);
@@ -50,11 +70,31 @@ async function addToTimelines(id, message) {
     const key = `user_${ids[i]}_timeline`;
     const exists = await redis.exists(key);
     if (exists) {
-      await redis.zadd(key, id, id);
+      await redis.zadd(key, postId, postId);
       // await redis.expire(key, REDIS_CONFIG.timeline.user);
     } else logger.info('skipping timeline update for ', key);
   }
+  logger.info('completed adding post to user timelines');
 }
+
+
+async function removeFromTimelines(postId, message) {
+  const { marriageId } = message;
+  logger.info('removing post from user timelines ', postId, JSON.stringify(message));
+
+  const mUsers = await rdsMUsers.getUsers(marriageId);
+  const ids = mUsers.items.map((user) => user.userId);
+  logger.info('total marriage users ', ids.length);
+  for (let i = 0; i < ids.length; i += 1) {
+    const key = `user_${ids[i]}_timeline`;
+    const exists = await redis.exists(key);
+    if (exists) {
+      await redis.zrem(key, postId);
+    } else logger.info('skipping timeline update for ', key);
+  }
+  logger.info('completed removing post from user timelines');
+}
+
 
 async function generateTimeline(userId) {
   logger.info('started generating timeline for user ', userId);
@@ -87,7 +127,8 @@ async function sns(request) {
       const id = await savePost(message);
       await addToTimelines(id, message);
     } else if (action === 'remove') {
-      logger.info('removing post');
+      const id = await removePost(message);
+      await removeFromTimelines(id, message);
     } else logger.warn('invalid post action received');
   } catch (err) {
     logger.error(err);
