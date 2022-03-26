@@ -1,5 +1,6 @@
 /* eslint-disable no-await-in-loop */
 const logger = require('./bk-utils/logger');
+const errors = require('./bk-utils/errors');
 const redis = require('./bk-utils/redis.helper');
 const constants = require('./bk-utils/constants');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
@@ -14,6 +15,8 @@ async function savePost(message) {
   const { type, userId } = message;
   let user;
   let insertId;
+  const postId = await rdsPosts.queryPost(message);
+  if (postId) errors.handleError(409, 'post already exists');
 
   switch (type) {
     case 'marriage.join':
