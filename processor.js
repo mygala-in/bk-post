@@ -11,7 +11,7 @@ const { STATUS } = constants.MARRIAGE_CONFIG;
 
 async function savePost(message) {
   logger.info('saving post');
-  const { type, userId, marriageId, assetType, resourceType } = message;
+  const { type, userId } = message;
   let user;
   let insertId;
 
@@ -19,7 +19,15 @@ async function savePost(message) {
     case 'marriage.join':
       // {"marriageId":"3","userId":"2","type":"marriage.join","assetType":"jpg","resourceType":0}
       user = await rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS);
-      ({ insertId } = await rdsPosts.insertPost({ type, userId, marriageId, assetType, resourceType, url: user.photo, meta: JSON.stringify(user) }));
+      Object.assign(message, { url: user.photo, meta: JSON.stringify(user) });
+      ({ insertId } = await rdsPosts.insertPost(message));
+      await rdsPosts.getPost(insertId);
+      break;
+
+    case 'marriage.post':
+      user = await rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS);
+      Object.assign(message, { meta: JSON.stringify(user) });
+      ({ insertId } = await rdsPosts.insertPost(message));
       await rdsPosts.getPost(insertId);
       break;
 
@@ -32,9 +40,9 @@ async function savePost(message) {
 }
 
 
-async function updateTimeline(id, message) {
+async function addToTimelines(id, message) {
   const { marriageId } = message;
-  logger.info('updating user timelines');
+  logger.info('adding post to user timelines');
   const mUsers = await rdsMUsers.getUsers(marriageId);
   const ids = mUsers.items.map((user) => user.userId);
   logger.info('total marriage users ', ids.length);
@@ -72,8 +80,15 @@ async function sns(request) {
   try {
     const message = JSON.parse(request.Records[0].Sns.Message);
     logger.info(JSON.stringify(message));
-    const id = await savePost(message);
-    await updateTimeline(id, message);
+    const { action } = message;
+    delete message.action;
+
+    if (action === 'add') {
+      const id = await savePost(message);
+      await addToTimelines(id, message);
+    } else if (action === 'remove') {
+      logger.info('removing post');
+    } else logger.warn('invalid post action received');
   } catch (err) {
     logger.error(err);
   }

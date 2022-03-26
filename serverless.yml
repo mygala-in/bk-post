@@ -84,6 +84,14 @@ functions:
           path: /v1/list
           method: any
           cors: ${self:custom.customCors}
+      - http:
+          path: /v1/{parentId}/like
+          method: put
+          cors: ${self:custom.customCors}
+      - http:
+          path: /v1/{parentId}/comment
+          method: post
+          cors: ${self:custom.customCors}
 
 resources:
   Conditions:
