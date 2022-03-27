@@ -1,9 +1,11 @@
 /* eslint-disable no-await-in-loop */
+const _ = require('underscore');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const redis = require('./bk-utils/redis.helper');
 const constants = require('./bk-utils/constants');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
+const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
@@ -117,6 +119,20 @@ async function generateTimeline(userId) {
 }
 
 
+async function likeAction(message) {
+  const { userId, marriageId, parentId } = message;
+  const muObj = await rdsMUsers.getUser(marriageId, userId);
+  logger.info('requested user ', muObj);
+
+  if (!_.isEmpty(muObj) && muObj.status === STATUS.verified) {
+    await rdsLikes.saveLike(message);
+  } else logger.warn('unauthorized like action');
+
+  await rdsLikes.countLikes(parentId);
+  logger.info('completed like action');
+}
+
+
 async function sns(request) {
   logger.info('received timeline event sns');
   logger.info(JSON.stringify(request));
@@ -138,6 +154,7 @@ async function sns(request) {
         await removeFromTimelines(id, message);
         break;
       case 'like':
+        await likeAction(message);
         break;
       case 'unlike':
         break;
