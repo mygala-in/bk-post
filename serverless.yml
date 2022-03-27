@@ -86,11 +86,11 @@ functions:
           cors: ${self:custom.customCors}
       - http:
           path: /v1/{parentId}/like
-          method: put
+          method: any
           cors: ${self:custom.customCors}
       - http:
           path: /v1/{parentId}/comment
-          method: post
+          method: any
           cors: ${self:custom.customCors}
 
 resources:
