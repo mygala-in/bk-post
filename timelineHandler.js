@@ -3,6 +3,7 @@ const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const access = require('./bk-utils/access');
 const redis = require('./bk-utils/redis.helper');
+const snsHelper = require('./bk-utils/sns.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 
 
@@ -28,6 +29,27 @@ async function getTimeline(request) {
   return resp;
 }
 
+async function likeAction(request) {
+  const { decoded, body } = request;
+  const { parentId } = request.pathParameters;
+  await Promise.all([
+    redis.incr(`${parentId}_likes`),
+    snsHelper.pushToSNS('timeline', { action: 'like', ...body, userId: decoded.id }),
+  ]);
+  return { success: true };
+}
+
+
+async function unlikeAction(request) {
+  const { decoded, body } = request;
+  const { parentId } = request.pathParameters;
+  await Promise.all([
+    redis.decr(`${parentId}_likes`),
+    snsHelper.pushToSNS('timeline', { action: 'unlike', ...body, userId: decoded.id }),
+  ]);
+  return { success: true };
+}
+
 
 async function invoke(event, context, callback) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials': true };
@@ -38,6 +60,12 @@ async function invoke(event, context, callback) {
     switch (request.resourcePath) {
       case '/v1/list':
         resp = await getTimeline(request);
+        break;
+      case '/v1/{parentId}/like':
+        if (request.httpMethod === 'PUT') resp = await likeAction(request);
+        else if (request.httpMethod === 'DELETE') resp = await unlikeAction(request);
+        break;
+      case '/v1/{parentId}/comment':
         break;
       default: errors.handleError(400, 'invalid request path');
     }

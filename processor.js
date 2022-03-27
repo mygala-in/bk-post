@@ -126,13 +126,24 @@ async function sns(request) {
     const { action } = message;
     delete message.action;
 
-    if (action === 'add') {
-      const id = await savePost(message);
-      await addToTimelines(id, message);
-    } else if (action === 'remove') {
-      const id = await removePost(message);
-      await removeFromTimelines(id, message);
-    } else logger.warn('invalid post action received');
+
+    let id;
+    switch (action) {
+      case 'post':
+        id = await savePost(message);
+        await addToTimelines(id, message);
+        break;
+      case 'unpost':
+        id = await removePost(message);
+        await removeFromTimelines(id, message);
+        break;
+      case 'like':
+        break;
+      case 'unlike':
+        break;
+      default:
+        logger.warn(`invalid post action ${action}`);
+    }
   } catch (err) {
     logger.error(err);
   }
