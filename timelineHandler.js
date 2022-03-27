@@ -34,7 +34,7 @@ async function likeAction(request) {
   const { parentId } = request.pathParameters;
   await Promise.all([
     redis.incr(`${parentId}_likes`),
-    snsHelper.pushToSNS('timeline', { action: 'like', ...body, userId: decoded.id }),
+    snsHelper.pushToSNS('timeline', { action: 'like', parentId, ...body, userId: decoded.id }),
   ]);
   return { success: true };
 }
@@ -45,7 +45,7 @@ async function unlikeAction(request) {
   const { parentId } = request.pathParameters;
   await Promise.all([
     redis.decr(`${parentId}_likes`),
-    snsHelper.pushToSNS('timeline', { action: 'unlike', ...body, userId: decoded.id }),
+    snsHelper.pushToSNS('timeline', { action: 'unlike', parentId, ...body, userId: decoded.id }),
   ]);
   return { success: true };
 }

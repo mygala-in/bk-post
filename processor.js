@@ -120,12 +120,26 @@ async function generateTimeline(userId) {
 
 
 async function likeAction(message) {
+  const { userId, marriageId, parentId, postId, type } = message;
+  const muObj = await rdsMUsers.getUser(marriageId, userId);
+  logger.info('requested user ', muObj);
+
+  if (!_.isEmpty(muObj) && muObj.status === STATUS.verified) {
+    await rdsLikes.saveLike({ userId, parentId, postId, type });
+  } else logger.warn('unauthorized like action');
+
+  await rdsLikes.countLikes(parentId);
+  logger.info('completed like action');
+}
+
+
+async function unlikeAction(message) {
   const { userId, marriageId, parentId } = message;
   const muObj = await rdsMUsers.getUser(marriageId, userId);
   logger.info('requested user ', muObj);
 
   if (!_.isEmpty(muObj) && muObj.status === STATUS.verified) {
-    await rdsLikes.saveLike(message);
+    await rdsLikes.deleteLike(parentId, userId);
   } else logger.warn('unauthorized like action');
 
   await rdsLikes.countLikes(parentId);
@@ -157,6 +171,7 @@ async function sns(request) {
         await likeAction(message);
         break;
       case 'unlike':
+        await unlikeAction(message);
         break;
       default:
         logger.warn(`invalid post action ${action}`);
