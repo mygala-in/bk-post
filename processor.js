@@ -125,7 +125,7 @@ async function likeAction(message) {
   logger.info('requested user ', muObj);
 
   if (!_.isEmpty(muObj) && muObj.status === STATUS.verified) {
-    await rdsLikes.saveLike({ userId, parentId, postId, type });
+    await rdsLikes.saveLike({ userId, parentId, postId, type, isDeleted: false });
   } else logger.warn('unauthorized like action');
 
   await rdsLikes.countLikes(parentId);
@@ -134,16 +134,10 @@ async function likeAction(message) {
 
 
 async function unlikeAction(message) {
-  const { userId, marriageId, parentId } = message;
-  const muObj = await rdsMUsers.getUser(marriageId, userId);
-  logger.info('requested user ', muObj);
-
-  if (!_.isEmpty(muObj) && muObj.status === STATUS.verified) {
-    await rdsLikes.deleteLike(parentId, userId);
-  } else logger.warn('unauthorized like action');
-
+  const { userId, parentId } = message;
+  await rdsLikes.deleteLike(parentId, userId);
   await rdsLikes.countLikes(parentId);
-  logger.info('completed like action');
+  logger.info('completed unlike action');
 }
 
 
