@@ -128,7 +128,7 @@ async function likeAction(message) {
     await rdsLikes.saveLike({ userId, parentId, postId, type, isDeleted: false });
   } else logger.warn('unauthorized like action');
 
-  await rdsLikes.countLikes(parentId);
+  await rdsLikes.recountLikes(parentId);
   logger.info('completed like action');
 }
 
@@ -136,7 +136,7 @@ async function likeAction(message) {
 async function unlikeAction(message) {
   const { userId, parentId } = message;
   await rdsLikes.deleteLike(parentId, userId);
-  await rdsLikes.countLikes(parentId);
+  await rdsLikes.recountLikes(parentId);
   logger.info('completed unlike action');
 }
 

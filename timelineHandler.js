@@ -5,6 +5,7 @@ const access = require('./bk-utils/access');
 const redis = require('./bk-utils/redis.helper');
 const snsHelper = require('./bk-utils/sns.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
+const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 
 
 async function getTimeline(request) {
@@ -18,13 +19,16 @@ async function getTimeline(request) {
   rank = rank || 0;
   total = total || 0;
   logger.info({ total, postId, rank });
-  let resp = { entity: 'collection', items: [], count: 0, total };
-  if (total === 0) return resp;
+  if (total === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  resp = await rdsPosts.getPostsIn(ids);
+  const [resp, likes] = await Promise.all([rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids)]);
+  for (let i = 0; i < resp.count; i += 1) {
+    resp.items[i].likes = { total: likes[i] || 0 };
+  }
+
   resp.total = total;
   return resp;
 }
