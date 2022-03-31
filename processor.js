@@ -120,13 +120,15 @@ async function generateTimeline(userId) {
 
 
 async function likeAction(message) {
-  const { userId, marriageId, parentId, postId, type } = message;
-  const muObj = await rdsMUsers.getUser(marriageId, userId);
+  const { id, userId, marriageId, parentId, postId } = message;
+  const [muObj, post] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId)]);
   logger.info('requested user ', muObj);
 
-  if (!_.isEmpty(muObj) && muObj.status === STATUS.verified) {
-    await rdsLikes.saveLike({ userId, parentId, postId, type, isDeleted: false });
-  } else logger.warn('unauthorized like action');
+  if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
+    logger.warn('unauthorized like action');
+    await rdsLikes.deleteLike(id);
+    return;
+  }
 
   await rdsLikes.recountLikes(parentId);
   logger.info('completed like action');
@@ -134,8 +136,7 @@ async function likeAction(message) {
 
 
 async function unlikeAction(message) {
-  const { userId, parentId } = message;
-  await rdsLikes.deleteLike(parentId, userId);
+  const { parentId } = message;
   await rdsLikes.recountLikes(parentId);
   logger.info('completed unlike action');
 }

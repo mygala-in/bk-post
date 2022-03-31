@@ -1,3 +1,4 @@
+const _ = require('underscore');
 const processor = require('./processor');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
@@ -33,23 +34,30 @@ async function getTimeline(request) {
   return resp;
 }
 
+
 async function likeAction(request) {
   const { decoded, body } = request;
-  const { parentId } = request.pathParameters;
-  await Promise.all([
-    redis.incr(`${parentId}_likes`),
-    snsHelper.pushToSNS('timeline', { action: 'like', parentId, ...body, userId: decoded.id }),
-  ]);
-  return { success: true };
+  const parentId = request.pathParameters.id;
+  const { postId, type, marriageId } = body;
+  const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
+
+  const resp = await rdsLikes.getLike(insertId);
+  await snsHelper.pushToSNS('timeline', { action: 'like', ...resp, marriageId });
+  return resp;
 }
 
 
 async function unlikeAction(request) {
-  const { decoded, body } = request;
-  const { parentId } = request.pathParameters;
+  const { decoded } = request;
+  const { id } = request.pathParameters;
+
+  const like = await rdsLikes.getLike(id);
+  if (_.isEmpty(like)) errors.handleError(404, 'like not found');
+  if (like.userId !== decoded.id) errors.handleError(401, 'unauthorized');
+
   await Promise.all([
-    redis.decr(`${parentId}_likes`),
-    snsHelper.pushToSNS('timeline', { action: 'unlike', parentId, ...body, userId: decoded.id }),
+    rdsLikes.deleteLike(id),
+    snsHelper.pushToSNS('timeline', { action: 'unlike', ...like }),
   ]);
   return { success: true };
 }
@@ -65,11 +73,11 @@ async function invoke(event, context, callback) {
       case '/v1/list':
         resp = await getTimeline(request);
         break;
-      case '/v1/{parentId}/like':
+      case '/v1/{id}/like':
         if (request.httpMethod === 'PUT') resp = await likeAction(request);
         else if (request.httpMethod === 'DELETE') resp = await unlikeAction(request);
         break;
-      case '/v1/{parentId}/comment':
+      case '/v1/{id}/comment':
         break;
       default: errors.handleError(400, 'invalid request path');
     }
