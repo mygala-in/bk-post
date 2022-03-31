@@ -75,6 +75,22 @@ async function commentAction(request) {
 }
 
 
+async function uncommentAction(request) {
+  const { decoded } = request;
+  const { id } = request.pathParameters;
+
+  const comment = await rdsComments.getComment(id);
+  if (_.isEmpty(comment)) errors.handleError(404, 'comment not found');
+  if (comment.userId !== decoded.id) errors.handleError(401, 'unauthorized');
+
+  await Promise.all([
+    rdsComments.deleteComment(id),
+    snsHelper.pushToSNS('timeline', { action: 'uncomment', ...comment }),
+  ]);
+  return { success: true };
+}
+
+
 async function invoke(event, context, callback) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials': true };
   try {
@@ -90,7 +106,17 @@ async function invoke(event, context, callback) {
         else if (request.httpMethod === 'DELETE') resp = await unlikeAction(request);
         break;
       case '/v1/{id}/comment':
-        if (request.httpMethod === 'PUT') resp = await commentAction(request);
+        switch (request.httpMethod) {
+          case 'POST':
+            resp = await commentAction(request);
+            break;
+          case 'PUT':
+            break;
+          case 'DELETE':
+            resp = await uncommentAction(request);
+            break;
+          default:
+        }
         break;
       default: errors.handleError(400, 'invalid request path');
     }

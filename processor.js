@@ -159,6 +159,13 @@ async function commentAction(message) {
 }
 
 
+async function uncommentAction(message) {
+  const { postId } = message;
+  await rdsComments.recountComments(postId);
+  logger.info('completed uncomment action');
+}
+
+
 async function sns(request) {
   logger.info('received timeline event sns');
   logger.info(JSON.stringify(request));
@@ -182,6 +189,7 @@ async function sns(request) {
       case 'like': await likeAction(message); break;
       case 'unlike': await unlikeAction(message); break;
       case 'comment': await commentAction(message); break;
+      case 'uncomment': await uncommentAction(message); break;
       default:
         logger.warn(`invalid post action ${action}`);
     }
