@@ -7,6 +7,7 @@ const constants = require('./bk-utils/constants');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
+const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
 const { MINI_PROFILE_FIELDS } = constants;
@@ -120,7 +121,7 @@ async function generateTimeline(userId) {
 
 
 async function likeAction(message) {
-  const { id, userId, marriageId, parentId, postId } = message;
+  const { id, userId, marriageId, postId } = message;
   const [muObj, post] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId)]);
   logger.info('requested user ', muObj);
 
@@ -130,15 +131,31 @@ async function likeAction(message) {
     return;
   }
 
-  await rdsLikes.recountLikes(parentId);
+  await rdsLikes.recountLikes(postId);
   logger.info('completed like action');
 }
 
 
 async function unlikeAction(message) {
-  const { parentId } = message;
-  await rdsLikes.recountLikes(parentId);
+  const { postId } = message;
+  await rdsLikes.recountLikes(postId);
   logger.info('completed unlike action');
+}
+
+
+async function commentAction(message) {
+  const { id, userId, marriageId, postId } = message;
+  const [muObj, post] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId)]);
+  logger.info('requested user ', muObj);
+
+  if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
+    logger.warn('unauthorized comment action');
+    await rdsComments.deleteComment(id);
+    return;
+  }
+
+  await rdsComments.recountComments(postId);
+  logger.info('completed comment action');
 }
 
 
@@ -162,12 +179,9 @@ async function sns(request) {
         id = await removePost(message);
         await removeFromTimelines(id, message);
         break;
-      case 'like':
-        await likeAction(message);
-        break;
-      case 'unlike':
-        await unlikeAction(message);
-        break;
+      case 'like': await likeAction(message); break;
+      case 'unlike': await unlikeAction(message); break;
+      case 'comment': await commentAction(message); break;
       default:
         logger.warn(`invalid post action ${action}`);
     }

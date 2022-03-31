@@ -7,7 +7,7 @@ const redis = require('./bk-utils/redis.helper');
 const snsHelper = require('./bk-utils/sns.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
-
+const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 
 async function getTimeline(request) {
   const { decoded } = request;
@@ -63,6 +63,18 @@ async function unlikeAction(request) {
 }
 
 
+async function commentAction(request) {
+  const { decoded, body } = request;
+  const parentId = request.pathParameters.id;
+  const { postId, type, text, marriageId } = body;
+  const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
+
+  const resp = await rdsComments.getComment(insertId);
+  await snsHelper.pushToSNS('timeline', { action: 'comment', ...resp, marriageId });
+  return resp;
+}
+
+
 async function invoke(event, context, callback) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials': true };
   try {
@@ -78,6 +90,7 @@ async function invoke(event, context, callback) {
         else if (request.httpMethod === 'DELETE') resp = await unlikeAction(request);
         break;
       case '/v1/{id}/comment':
+        if (request.httpMethod === 'PUT') resp = await commentAction(request);
         break;
       default: errors.handleError(400, 'invalid request path');
     }
