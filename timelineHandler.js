@@ -63,19 +63,19 @@ async function unlikeAction(request) {
 }
 
 
-async function commentAction(request) {
+async function newComment(request) {
   const { decoded, body } = request;
   const parentId = request.pathParameters.id;
   const { postId, type, text, marriageId } = body;
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
 
   const resp = await rdsComments.getComment(insertId);
-  await snsHelper.pushToSNS('timeline', { action: 'comment', ...resp, marriageId });
+  await snsHelper.pushToSNS('timeline', { action: 'new-comment', ...resp, marriageId });
   return resp;
 }
 
 
-async function uncommentAction(request) {
+async function deleteComment(request) {
   const { decoded } = request;
   const { id } = request.pathParameters;
 
@@ -85,10 +85,28 @@ async function uncommentAction(request) {
 
   await Promise.all([
     rdsComments.deleteComment(id),
-    snsHelper.pushToSNS('timeline', { action: 'uncomment', ...comment }),
+    snsHelper.pushToSNS('timeline', { action: 'delete-comment', ...comment }),
   ]);
   return { success: true };
 }
+
+
+async function editComment(request) {
+  const { decoded, body } = request;
+  const { id } = request.pathParameters;
+
+  const comment = await rdsComments.getComment(id);
+  if (_.isEmpty(comment)) errors.handleError(404, 'comment not found');
+  if (comment.userId !== decoded.id) errors.handleError(401, 'unauthorized');
+
+  await Promise.all([
+    rdsComments.updateComment(id, { ...body }),
+    snsHelper.pushToSNS('timeline', { action: 'edit-comment', ...comment }),
+  ]);
+  Object.assign(comment, body);
+  return comment;
+}
+
 
 
 async function invoke(event, context, callback) {
@@ -101,23 +119,27 @@ async function invoke(event, context, callback) {
       case '/v1/list':
         resp = await getTimeline(request);
         break;
+
       case '/v1/{id}/like':
         if (request.httpMethod === 'PUT') resp = await likeAction(request);
         else if (request.httpMethod === 'DELETE') resp = await unlikeAction(request);
         break;
+
       case '/v1/{id}/comment':
         switch (request.httpMethod) {
           case 'POST':
-            resp = await commentAction(request);
+            resp = await newComment(request);
             break;
           case 'PUT':
+            resp = await editComment(request);
             break;
           case 'DELETE':
-            resp = await uncommentAction(request);
+            resp = await deleteComment(request);
             break;
           default:
         }
         break;
+
       default: errors.handleError(400, 'invalid request path');
     }
     context.callbackWaitsForEmptyEventLoop = false;

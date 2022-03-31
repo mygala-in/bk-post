@@ -143,7 +143,7 @@ async function unlikeAction(message) {
 }
 
 
-async function commentAction(message) {
+async function newComment(message) {
   const { id, userId, marriageId, postId } = message;
   const [muObj, post] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId)]);
   logger.info('requested user ', muObj);
@@ -159,7 +159,12 @@ async function commentAction(message) {
 }
 
 
-async function uncommentAction(message) {
+async function editComment() {
+  logger.info('completed edit comment action');
+}
+
+
+async function deleteComment(message) {
   const { postId } = message;
   await rdsComments.recountComments(postId);
   logger.info('completed uncomment action');
@@ -188,8 +193,10 @@ async function sns(request) {
         break;
       case 'like': await likeAction(message); break;
       case 'unlike': await unlikeAction(message); break;
-      case 'comment': await commentAction(message); break;
-      case 'uncomment': await uncommentAction(message); break;
+
+      case 'new-comment': await newComment(message); break;
+      case 'edit-comment': await editComment(message); break;
+      case 'delete-comment': await deleteComment(message); break;
       default:
         logger.warn(`invalid post action ${action}`);
     }
