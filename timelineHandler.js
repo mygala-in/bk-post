@@ -25,10 +25,10 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const [resp, likes, comments] = await Promise.all([rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids)]);
+  const [resp, totalLikes, totalComments] = await Promise.all([rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids)]);
   for (let i = 0; i < resp.count; i += 1) {
-    resp.items[i].likes = { total: likes[i] || 0 };
-    resp.items[i].comments = { total: comments[i] || 0 };
+    resp.items[i].likes = { total: totalLikes[i] || 0 };
+    resp.items[i].comments = { total: totalComments[i] || 0 };
   }
 
   resp.total = total;

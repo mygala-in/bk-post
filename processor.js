@@ -10,7 +10,7 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS } = constants;
+const { MINI_PROFILE_FIELDS, LIMITS_CONFIG } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
 
 async function savePost(message) {
@@ -122,9 +122,8 @@ async function generateTimeline(userId) {
 
 async function likeAction(message) {
   const { id, userId, marriageId, postId } = message;
-  const [muObj, post] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId)]);
+  const [muObj, post, user, like] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsLikes.getLike(id)]);
   logger.info('requested user ', muObj);
-
   if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
     logger.warn('unauthorized like action');
     await rdsLikes.deleteLike(id);
@@ -132,6 +131,14 @@ async function likeAction(message) {
   }
 
   await rdsLikes.recountLikes(postId);
+
+  const key = `${postId}_recent_likes`;
+  like.user = user;
+  await redis.rpush(key, JSON.stringify(like));
+  const count = await redis.llen(key);
+  logger.info('total recent likes ', count);
+  if (count > LIMITS_CONFIG.timeline.recent.likes) await redis.lpop(key, 'json');
+
   logger.info('completed like action');
 }
 
