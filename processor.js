@@ -144,7 +144,7 @@ async function likeAction(message) {
       const res = await redis.lpop(key, 'int');
       logger.info('removed old like ', res);
     }
-    await redis.ttl(key, REDIS_CONFIG.timeline.likes);
+    await redis.expire(key, REDIS_CONFIG.timeline.likes);
   }
   logger.info('completed like action');
 }
@@ -184,7 +184,7 @@ async function newComment(message) {
       const res = await redis.lpop(key, 'int');
       logger.info('removed old comments ', res);
     }
-    await redis.ttl(key, REDIS_CONFIG.timeline.comments);
+    await redis.expire(key, REDIS_CONFIG.timeline.comments);
   }
   logger.info('completed comment action');
 }
@@ -206,7 +206,7 @@ async function editComment(message) {
       const res = await redis.lpop(key, 'int');
       logger.info('removed old comments ', res);
     }
-    await redis.ttl(key, REDIS_CONFIG.timeline.comments);
+    await redis.expire(key, REDIS_CONFIG.timeline.comments);
   }
   logger.info('completed edit comment action');
 }
