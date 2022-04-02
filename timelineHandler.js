@@ -108,6 +108,7 @@ async function getTimeline(request) {
   }
 
   resp.total = total;
+  logger.info('final timeline ', JSON.stringify(resp));
   return resp;
 }
 
