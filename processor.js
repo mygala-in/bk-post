@@ -10,7 +10,7 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS, LIMITS_CONFIG } = constants;
+const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
 
 async function savePost(message) {
@@ -132,20 +132,29 @@ async function likeAction(message) {
 
   await rdsLikes.recountLikes(postId);
 
-  const key = `${postId}_recent_likes`;
   like.user = user;
-  await redis.rpush(key, JSON.stringify(like));
-  const count = await redis.llen(key);
-  logger.info('total recent likes ', count);
-  if (count > LIMITS_CONFIG.timeline.recent.likes) await redis.lpop(key, 'json');
-
+  await redis.set(`like_${id}`, JSON.stringify(like), REDIS_CONFIG.timeline.likes);
+  const key = `${postId}_recent_likes`;
+  const ids = await redis.lrange(key, 'int');
+  if (!ids.includes(id)) {
+    await redis.rpush(key, id);
+    const count = await redis.llen(key);
+    logger.info('total recent likes ', count);
+    if (count > LIMITS_CONFIG.timeline.recent.likes) {
+      const res = await redis.lpop(key, 'int');
+      logger.info('removed old like ', res);
+    }
+    await redis.ttl(key, REDIS_CONFIG.timeline.likes);
+  }
   logger.info('completed like action');
 }
 
 
 async function unlikeAction(message) {
-  const { postId } = message;
+  const { id, postId } = message;
   await rdsLikes.recountLikes(postId);
+  await redis.del(`${id}_like`);
+  await redis.lrem(`${postId}_recent_likes`, id);
   logger.info('completed unlike action');
 }
 
