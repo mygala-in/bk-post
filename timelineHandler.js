@@ -4,10 +4,58 @@ const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const access = require('./bk-utils/access');
 const redis = require('./bk-utils/redis.helper');
+const constants = require('./bk-utils/constants');
 const snsHelper = require('./bk-utils/sns.helper');
+const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
+
+
+
+async function getRecentLikes(postIds, userId) {
+  const resp = { type: 'collection', count: 0, items: [] };
+  try {
+    if (postIds.length === 0) return resp;
+    const tasks = [];
+    for (let i = 0; i < postIds.length; i += 1) {
+      tasks.push(redis.lrange(`${postIds[i]}_recent_likes`, 'int'));
+    }
+    const cache = await Promise.all(tasks);
+    const likeIds = _.flatten(cache);
+    logger.info('recent like ids', JSON.stringify(likeIds));
+    if (likeIds.length === 0) return resp;
+
+    resp.items = await redis.mget(likeIds.map((k) => `like_${k}`), 'json');
+    resp.items = resp.items.filter((k) => k !== null);
+    resp.count = resp.items.length;
+
+    // TODO - manually fetch requested user's like for all postIds
+    const missed = [];
+    for (let i = 0; i < postIds.length; i += 1) {
+      if (resp.items.filter((k) => k.postId === postIds[i] && k.userId === userId).length === 0) {
+        missed.push(postIds[i]);
+      }
+    }
+    logger.info('user missed post likes', missed);
+    if (missed.length > 0) {
+      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed)]);
+      for (let k = 0; k < likes.count; k += 1) {
+        const like = likes.items[k];
+        like.user = user;
+        resp.items.push(like);
+      }
+      resp.count = resp.items.length;
+    }
+
+    logger.info('final recent likes ', JSON.stringify(resp));
+  } catch (err) {
+    logger.error(err);
+  }
+  return resp;
+}
+
+
 
 async function getTimeline(request) {
   const { decoded } = request;
@@ -25,9 +73,10 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const [resp, totalLikes, totalComments] = await Promise.all([rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids)]);
+  const [resp, totalLikes, totalComments, recentLikes] = await Promise.all([rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids), getRecentLikes(ids, decoded.id)]);
   for (let i = 0; i < resp.count; i += 1) {
-    resp.items[i].likes = { total: totalLikes[i] || 0 };
+    const items = recentLikes.items.filter((k) => k.postId === resp.items[i].id);
+    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items, count: items.length };
     resp.items[i].comments = { total: totalComments[i] || 0 };
   }
 

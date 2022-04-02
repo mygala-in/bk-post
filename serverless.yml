@@ -1,6 +1,5 @@
 service: mygala-bk-timeline
 frameworkVersion: '3.10.2'
-variablesResolutionMode: 20210326
 configValidationMode: error
 
 plugins:
@@ -54,7 +53,6 @@ provider:
       - ${self:custom.config.subnet2}
       - ${self:custom.config.subnet3}
   endpointType: REGIONAL
-  lambdaHashingVersion: '20201221'
   deploymentBucket: ${self:provider.stage}-mygala-sls-deployments
   environment:
     stage: ${self:provider.stage}
