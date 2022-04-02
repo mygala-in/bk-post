@@ -30,7 +30,6 @@ async function getRecentLikes(postIds, userId) {
     resp.items = resp.items.filter((k) => k !== null);
     resp.count = resp.items.length;
 
-    // TODO - manually fetch requested user's like for all postIds
     const missed = [];
     for (let i = 0; i < postIds.length; i += 1) {
       if (resp.items.filter((k) => k.postId === postIds[i] && k.userId === userId).length === 0) {
@@ -56,6 +55,30 @@ async function getRecentLikes(postIds, userId) {
 }
 
 
+async function getRecentComments(postIds) {
+  const resp = { type: 'collection', count: 0, items: [] };
+  try {
+    if (postIds.length === 0) return resp;
+    const tasks = [];
+    for (let i = 0; i < postIds.length; i += 1) {
+      tasks.push(redis.lrange(`${postIds[i]}_recent_comments`, 'int'));
+    }
+    const cache = await Promise.all(tasks);
+    const commentIds = _.flatten(cache);
+    logger.info('recent comment ids', JSON.stringify(commentIds));
+    if (commentIds.length === 0) return resp;
+
+    resp.items = await redis.mget(commentIds.map((k) => `comment_${k}`), 'json');
+    resp.items = resp.items.filter((k) => k !== null);
+    resp.count = resp.items.length;
+    logger.info('final recent comments ', JSON.stringify(resp));
+  } catch (err) {
+    logger.error(err);
+  }
+  return resp;
+}
+
+
 
 async function getTimeline(request) {
   const { decoded } = request;
@@ -73,11 +96,15 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const [resp, totalLikes, totalComments, recentLikes] = await Promise.all([rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids), getRecentLikes(ids, decoded.id)]);
+  const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids), getRecentLikes(ids, decoded.id),
+    getRecentComments(ids),
+  ]);
   for (let i = 0; i < resp.count; i += 1) {
-    const items = recentLikes.items.filter((k) => k.postId === resp.items[i].id);
-    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items, count: items.length };
-    resp.items[i].comments = { total: totalComments[i] || 0 };
+    const likes = recentLikes.items.filter((k) => k.postId === resp.items[i].id);
+    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
+    const comments = recentComments.items.filter((k) => k.postId === resp.items[i].id);
+    resp.items[i].comments = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
   }
 
   resp.total = total;

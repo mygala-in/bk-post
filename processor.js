@@ -153,7 +153,7 @@ async function likeAction(message) {
 async function unlikeAction(message) {
   const { id, postId } = message;
   await rdsLikes.recountLikes(postId);
-  await redis.del(`${id}_like`);
+  await redis.del(`like_${id}`);
   await redis.lrem(`${postId}_recent_likes`, id);
   logger.info('completed unlike action');
 }
@@ -161,7 +161,7 @@ async function unlikeAction(message) {
 
 async function newComment(message) {
   const { id, userId, marriageId, postId } = message;
-  const [muObj, post] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId)]);
+  const [muObj, post, user, comment] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
   logger.info('requested user ', muObj);
 
   if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
@@ -171,18 +171,52 @@ async function newComment(message) {
   }
 
   await rdsComments.recountComments(postId);
+
+  comment.user = user;
+  await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
+  const key = `${postId}_recent_comments`;
+  const ids = await redis.lrange(key, 'int');
+  if (!ids.includes(id)) {
+    await redis.rpush(key, id);
+    const count = await redis.llen(key);
+    logger.info('total recent comments ', count);
+    if (count > LIMITS_CONFIG.timeline.recent.comments) {
+      const res = await redis.lpop(key, 'int');
+      logger.info('removed old comments ', res);
+    }
+    await redis.ttl(key, REDIS_CONFIG.timeline.comments);
+  }
   logger.info('completed comment action');
 }
 
 
-async function editComment() {
+async function editComment(message) {
+  const { id, userId, postId } = message;
+  const [user, comment] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
+
+  comment.user = user;
+  await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
+  const key = `${postId}_recent_comments`;
+  const ids = await redis.lrange(key, 'int');
+  if (!ids.includes(id)) {
+    await redis.rpush(key, id);
+    const count = await redis.llen(key);
+    logger.info('total recent comments ', count);
+    if (count > LIMITS_CONFIG.timeline.recent.comments) {
+      const res = await redis.lpop(key, 'int');
+      logger.info('removed old comments ', res);
+    }
+    await redis.ttl(key, REDIS_CONFIG.timeline.comments);
+  }
   logger.info('completed edit comment action');
 }
 
 
 async function deleteComment(message) {
-  const { postId } = message;
+  const { id, postId } = message;
   await rdsComments.recountComments(postId);
+  await redis.del(`comment_${id}`);
+  await redis.lrem(`${postId}_recent_comments`, id);
   logger.info('completed uncomment action');
 }
 
