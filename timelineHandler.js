@@ -24,12 +24,11 @@ async function getRecentLikes(postIds, userId) {
     const cache = await Promise.all(tasks);
     const likeIds = _.flatten(cache);
     logger.info('recent like ids', JSON.stringify(likeIds));
-    if (likeIds.length === 0) return resp;
-
-    resp.items = await redis.mget(likeIds.map((k) => `like_${k}`), 'json');
-    resp.items = resp.items.filter((k) => k !== null);
-    resp.count = resp.items.length;
-
+    if (likeIds.length > 0) {
+      resp.items = await redis.mget(likeIds.map((k) => `like_${k}`), 'json');
+      resp.items = resp.items.filter((k) => k !== null);
+      resp.count = resp.items.length;
+    }
     const missed = [];
     for (let i = 0; i < postIds.length; i += 1) {
       if (resp.items.filter((k) => k.postId === postIds[i] && k.userId === userId).length === 0) {

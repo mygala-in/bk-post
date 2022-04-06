@@ -116,6 +116,7 @@ async function generateTimeline(userId) {
     tasks.push(redis.zadd(`user_${userId}_timeline`, id, id));
   }
   await Promise.all(tasks);
+  await redis.expire(`user_${userId}_timeline`, REDIS_CONFIG.timeline.user);
   logger.info('completed generating timeline for user');
 }
 
