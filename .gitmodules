@@ -1,6 +1,6 @@
 [submodule "bk-config"]
 	path = bk-config
-	url = git@github.com-personal:gala-in/bk-config.git
+	url = https://github.com/gala-in/bk-config.git
 [submodule "bk-utils"]
 	path = bk-utils
-	url = git@github.com-personal:gala-in/bk-utils.git
+	url = https://github.com/gala-in/bk-utils.git
