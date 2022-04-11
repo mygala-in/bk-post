@@ -1,9 +1,8 @@
 service: mygala-bk-timeline
-frameworkVersion: '3.10.2'
+frameworkVersion: '3.12.0'
 configValidationMode: error
 
 plugins:
-  - serverless-offline
   - serverless-prune-plugin
   - serverless-domain-manager
 

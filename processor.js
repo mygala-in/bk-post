@@ -8,7 +8,6 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
 const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG } = constants;
@@ -16,21 +15,21 @@ const { STATUS } = constants.MARRIAGE_CONFIG;
 
 async function savePost(message) {
   logger.info('saving post');
-  const { type, userId, marriageId } = message;
-  const [postId, user, marriage] = await Promise.all([rdsPosts.queryPost(message), rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS), rdsMarriages.getMarriage(marriageId)]);
+  const { type, userId } = message;
+  const [postId, user] = await Promise.all([rdsPosts.queryPost(message), rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS)]);
   if (postId) errors.handleError(409, 'post already exists');
 
   let insertId;
   switch (type) {
     case 'marriage.join':
       // {"marriageId":"3","userId":"2","type":"marriage.join","assetType":"jpg","resourceType":0}
-      Object.assign(message, { url: user.photo, meta: JSON.stringify({ user, marriage }) });
+      Object.assign(message, { url: user.photo, meta: JSON.stringify({}) });
       ({ insertId } = await rdsPosts.insertPost(message));
       await rdsPosts.getPost(insertId);
       break;
 
     case 'marriage.post':
-      Object.assign(message, { meta: JSON.stringify({ user, marriage }) });
+      Object.assign(message, { meta: JSON.stringify({}) });
       ({ insertId } = await rdsPosts.insertPost(message));
       await rdsPosts.getPost(insertId);
       break;

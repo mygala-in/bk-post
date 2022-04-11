@@ -10,6 +10,7 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
+const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
 
 
 
@@ -99,7 +100,15 @@ async function getTimeline(request) {
     rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids), getRecentLikes(ids, decoded.id),
     getRecentComments(ids),
   ]);
+  const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
+  logger.info('marriage ids ', mIds);
+  const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
+  logger.info('user ids ', uIds);
+  const [users, marriages] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS), rdsMarriages.getMarriagesIn(mIds)]);
+
   for (let i = 0; i < resp.count; i += 1) {
+    if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
+    if (resp.items[i].marriageId) [resp.items[i].marriage] = marriages.items.filter((u) => u.id === resp.items[i].marriageId);
     const likes = recentLikes.items.filter((k) => k.postId === resp.items[i].id);
     resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
     const comments = recentComments.items.filter((k) => k.postId === resp.items[i].id);
