@@ -127,8 +127,9 @@ async function likeAction(request) {
   const { postId, type, marriageId } = body;
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
 
-  const resp = await rdsLikes.getLike(insertId);
+  const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, constants.MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline', { action: 'like', ...resp, marriageId });
+  resp.user = user;
   return resp;
 }
 
@@ -155,8 +156,9 @@ async function newComment(request) {
   const { postId, type, text, marriageId } = body;
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
 
-  const resp = await rdsComments.getComment(insertId);
+  const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, constants.MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline', { action: 'new-comment', ...resp, marriageId });
+  resp.user = user;
   return resp;
 }
 
