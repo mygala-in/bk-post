@@ -196,6 +196,41 @@ async function editComment(request) {
 }
 
 
+async function getComments(request) {
+  // const { decoded } = request;
+  const parentId = request.pathParameters.id;
+  const { page } = request.queryStringParameters;
+
+  // TODO - check user is authorized to access requested parent
+  const resp = await rdsComments.getComments(parentId, page, 15);
+  const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
+  logger.info('user ids ', uIds);
+  const users = await rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS);
+  for (let i = 0; i < resp.count; i += 1) {
+    if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
+  }
+  return resp;
+}
+
+
+async function getLikes(request) {
+  // const { decoded } = request;
+  const parentId = request.pathParameters.id;
+  const { page } = request.queryStringParameters;
+
+  // TODO - check user is authorized to access requested parent
+  const resp = await rdsLikes.getLikes(parentId, page, 15);
+  const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
+  logger.info('user ids ', uIds);
+  const users = await rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS);
+  for (let i = 0; i < resp.count; i += 1) {
+    if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
+  }
+  return resp;
+}
+
+
+
 
 async function invoke(event, context, callback) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials': true };
@@ -211,6 +246,14 @@ async function invoke(event, context, callback) {
       case '/v1/{id}/like':
         if (request.httpMethod === 'PUT') resp = await likeAction(request);
         else if (request.httpMethod === 'DELETE') resp = await unlikeAction(request);
+        break;
+
+      case '/v1/{id}/likes':
+        resp = await getLikes(request);
+        break;
+
+      case '/v1/{id}/comments':
+        resp = await getComments(request);
         break;
 
       case '/v1/{id}/comment':

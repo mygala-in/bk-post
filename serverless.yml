@@ -89,6 +89,14 @@ functions:
           path: /v1/{id}/comment
           method: any
           cors: ${self:custom.customCors}
+      - http:
+          path: /v1/{id}/likes
+          method: get
+          cors: ${self:custom.customCors}
+      - http:
+          path: /v1/{id}/comments
+          method: get
+          cors: ${self:custom.customCors}
 
 
 resources:
