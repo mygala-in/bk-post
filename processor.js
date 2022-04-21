@@ -10,7 +10,7 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG } = constants;
+const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG, TIMELINE_CONFIG } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
 
 async function savePost(message) {
@@ -119,20 +119,33 @@ async function generateTimeline(userId) {
 
 
 async function likeAction(message) {
-  const { id, userId, marriageId, postId } = message;
-  const [muObj, post, user, like] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsLikes.getLike(id)]);
-  logger.info('requested user ', muObj);
-  if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
-    logger.warn('unauthorized like action');
+  const { id, userId, type, postId } = message;
+  if (!TIMELINE_CONFIG.like.includes(type)) {
+    logger.warn(`invalid like action performed on type ${type}, Allowed types are ${TIMELINE_CONFIG.like}`);
     await rdsLikes.deleteLike(id);
     return;
   }
+  const [post, like, user] = await Promise.all([rdsPosts.getPost(postId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
+  const { marriageId } = post;
+  if (marriageId) {
+    const muObj = await rdsMUsers.getUser(marriageId, userId);
+    logger.info('requested user ', muObj);
+    if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
+      logger.warn('unauthorized like action');
+      await rdsLikes.deleteLike(id);
+      return;
+    }
+  }
+
+  let key;
+  if (TIMELINE_CONFIG.post.includes(type)) key = `post_${like.postId}_recent_likes`;
+  else if (type.includes('comment') || type.includes('reply')) key = `comment_${like.parentId}_recent_likes`;
+  else errors.handleError(400, 'like cannot be processed');
 
   await rdsLikes.recountLikes(postId);
-
   like.user = user;
   await redis.set(`like_${id}`, JSON.stringify(like), REDIS_CONFIG.timeline.likes);
-  const key = `${postId}_recent_likes`;
+
   const ids = await redis.lrange(key, 'int');
   if (!ids.includes(id)) {
     await redis.rpush(key, id);
@@ -149,10 +162,16 @@ async function likeAction(message) {
 
 
 async function unlikeAction(message) {
-  const { id, postId } = message;
-  await rdsLikes.recountLikes(postId);
-  await redis.del(`like_${id}`);
-  await redis.lrem(`${postId}_recent_likes`, id);
+  const { id } = message;
+  const like = await rdsLikes.getLike(id);
+  const { type, postId, parentId } = like;
+
+  let key;
+  if (TIMELINE_CONFIG.post.includes(type)) key = `post_${postId}_recent_likes`;
+  else if (type.includes('comment') || type.includes('reply')) key = `comment_${parentId}_recent_likes`;
+  else errors.handleError(400, 'like cannot be processed');
+
+  await Promise.all([rdsLikes.recountLikes(postId), redis.del(`like_${id}`), redis.lrem(key, id)]);
   logger.info('completed unlike action');
 }
 

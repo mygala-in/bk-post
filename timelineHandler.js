@@ -20,7 +20,7 @@ async function getRecentLikes(postIds, userId) {
     if (postIds.length === 0) return resp;
     const tasks = [];
     for (let i = 0; i < postIds.length; i += 1) {
-      tasks.push(redis.lrange(`${postIds[i]}_recent_likes`, 'int'));
+      tasks.push(redis.lrange(`post_${postIds[i]}_recent_likes`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const likeIds = _.flatten(cache);
@@ -124,11 +124,11 @@ async function getTimeline(request) {
 async function likeAction(request) {
   const { decoded, body } = request;
   const parentId = request.pathParameters.id;
-  const { postId, type, marriageId } = body;
+  const { postId, type } = body;
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, constants.MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline', { action: 'like', ...resp, marriageId });
+  await snsHelper.pushToSNS('timeline', { action: 'like', ...resp });
   resp.user = user;
   return resp;
 }
