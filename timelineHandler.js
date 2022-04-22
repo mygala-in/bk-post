@@ -97,7 +97,7 @@ async function getTimeline(request) {
   logger.info('user timeline post ids', ids);
 
   const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, decoded.id),
+    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, decoded.id),
     getRecentComments(ids),
   ]);
   const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));

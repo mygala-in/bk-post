@@ -44,7 +44,7 @@ async function savePost(message) {
   let insertId;
   switch (type) {
     case 'marriage.join':
-      // {"marriageId":"3","userId":"2","type":"marriage.join","assetType":"jpg","resourceType":0}
+      // {"marriageId":3,"userId":1, "action": "post", "type":"marriage.join","assetType":"jpg","resourceType":0}
       Object.assign(message, { url: user.photo, meta: JSON.stringify({}) });
       ({ insertId } = await rdsPosts.insertPost(message));
       await rdsPosts.getPost(insertId);
@@ -203,7 +203,7 @@ async function newComment(message) {
   comment.user = user;
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
-  await rdsComments.recountComments(postId, comment.type);
+  await rdsComments.recountComments(comment.parentId, comment.type);
 
   const key = getRecentCommentsKey(comment);
   logger.info('recent comments key ', key);
