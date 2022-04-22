@@ -10,8 +10,30 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG, TIMELINE_CONFIG } = constants;
+const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
+
+
+function getRecentLikesKey(like) {
+  const postfix = 'recent_likes';
+  const { parentId, postId, type } = like;
+  switch (type) {
+    case 'post': return `post_${postId}_${postfix}`;
+    case 'comment': return `comment_${parentId}_${postfix}`;
+    default: return null;
+  }
+}
+
+function getRecentCommentsKey(comment) {
+  const postfix = 'recent_comments';
+  const { parentId, postId, type } = comment;
+  switch (type) {
+    case 'post': return `post_${postId}_${postfix}`;
+    case 'comment': return `comment_${parentId}_${postfix}`;
+    default: return null;
+  }
+}
+
 
 async function savePost(message) {
   logger.info('saving post');
@@ -119,12 +141,7 @@ async function generateTimeline(userId) {
 
 
 async function likeAction(message) {
-  const { id, userId, type, postId } = message;
-  if (!TIMELINE_CONFIG.like.includes(type)) {
-    logger.warn(`invalid like action performed on type ${type}, Allowed types are ${TIMELINE_CONFIG.like}`);
-    await rdsLikes.deleteLike(id);
-    return;
-  }
+  const { id, userId, postId } = message;
   const [post, like, user] = await Promise.all([rdsPosts.getPost(postId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
   const { marriageId } = post;
   if (marriageId) {
@@ -136,16 +153,15 @@ async function likeAction(message) {
       return;
     }
   }
-
-  let key;
-  if (TIMELINE_CONFIG.post.includes(type)) key = `post_${like.postId}_recent_likes`;
-  else if (type.includes('comment') || type.includes('reply')) key = `comment_${like.parentId}_recent_likes`;
-  else errors.handleError(400, 'like cannot be processed');
-
-  await rdsLikes.recountLikes(postId);
   like.user = user;
   await redis.set(`like_${id}`, JSON.stringify(like), REDIS_CONFIG.timeline.likes);
 
+  await rdsLikes.recountLikes(like.parentId, like.type);
+
+  const key = getRecentLikesKey(like);
+  logger.info('recent likes key ', key);
+  if (!key) return;
+  logger.info(`saving into recent likes :: ${key}`);
   const ids = await redis.lrange(key, 'int');
   if (!ids.includes(id)) {
     await redis.rpush(key, id);
@@ -157,41 +173,41 @@ async function likeAction(message) {
     }
     await redis.expire(key, REDIS_CONFIG.timeline.likes);
   }
-  logger.info('completed like action');
+  logger.info('completed like actions');
 }
 
 
 async function unlikeAction(message) {
   const { id } = message;
   const like = await rdsLikes.getLike(id);
-  const { type, postId, parentId } = like;
-
-  let key;
-  if (TIMELINE_CONFIG.post.includes(type)) key = `post_${postId}_recent_likes`;
-  else if (type.includes('comment') || type.includes('reply')) key = `comment_${parentId}_recent_likes`;
-  else errors.handleError(400, 'like cannot be processed');
-
-  await Promise.all([rdsLikes.recountLikes(postId), redis.del(`like_${id}`), redis.lrem(key, id)]);
-  logger.info('completed unlike action');
+  await Promise.all([rdsLikes.recountLikes(like.parentId, like.type), redis.del(`like_${id}`)]);
+  const key = getRecentLikesKey(like);
+  if (key) await redis.lrem(key, id);
+  logger.info('completed unlike actions');
 }
 
 
 async function newComment(message) {
-  const { id, userId, marriageId, postId } = message;
-  const [muObj, post, user, comment] = await Promise.all([rdsMUsers.getUser(marriageId, userId), rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
-  logger.info('requested user ', muObj);
-
-  if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
-    logger.warn('unauthorized comment action');
-    await rdsComments.deleteComment(id);
-    return;
+  const { id, userId, postId } = message;
+  const [post, user, comment] = await Promise.all([rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
+  const { marriageId } = post;
+  if (marriageId) {
+    const muObj = await rdsMUsers.getUser(marriageId, userId);
+    logger.info('requested user ', muObj);
+    if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
+      logger.warn('unauthorized comment action');
+      await rdsComments.deleteComment(id);
+      return;
+    }
   }
-
-  await rdsComments.recountComments(postId);
-
   comment.user = user;
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
-  const key = `${postId}_recent_comments`;
+
+  await rdsComments.recountComments(postId, comment.type);
+
+  const key = getRecentCommentsKey(comment);
+  logger.info('recent comments key ', key);
+  if (!key) return;
   const ids = await redis.lrange(key, 'int');
   if (!ids.includes(id)) {
     await redis.rpush(key, id);
@@ -203,17 +219,20 @@ async function newComment(message) {
     }
     await redis.expire(key, REDIS_CONFIG.timeline.comments);
   }
-  logger.info('completed comment action');
+  logger.info('completed comment actions');
 }
 
 
 async function editComment(message) {
-  const { id, userId, postId } = message;
+  const { id, userId } = message;
   const [user, comment] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
 
   comment.user = user;
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
-  const key = `${postId}_recent_comments`;
+
+  const key = getRecentCommentsKey(comment);
+  logger.info('recent comments key ', key);
+  if (!key) return;
   const ids = await redis.lrange(key, 'int');
   if (!ids.includes(id)) {
     await redis.rpush(key, id);
@@ -225,18 +244,18 @@ async function editComment(message) {
     }
     await redis.expire(key, REDIS_CONFIG.timeline.comments);
   }
-  logger.info('completed edit comment action');
+  logger.info('completed edit comment actions');
 }
 
 
 async function deleteComment(message) {
-  const { id, postId } = message;
-  await rdsComments.recountComments(postId);
-  await redis.del(`comment_${id}`);
-  await redis.lrem(`${postId}_recent_comments`, id);
-  logger.info('completed uncomment action');
+  const { id } = message;
+  const comment = await rdsComments.getComment(id);
+  await Promise.all([rdsComments.recountComments(comment.parentId, comment.type), redis.del(`comment_${id}`)]);
+  const key = getRecentCommentsKey(comment);
+  if (key) await redis.lrem(key, id);
+  logger.info('completed uncomment actions');
 }
-
 
 async function sns(request) {
   logger.info('received timeline event sns');

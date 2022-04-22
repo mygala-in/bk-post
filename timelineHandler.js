@@ -61,7 +61,7 @@ async function getRecentComments(postIds) {
     if (postIds.length === 0) return resp;
     const tasks = [];
     for (let i = 0; i < postIds.length; i += 1) {
-      tasks.push(redis.lrange(`${postIds[i]}_recent_comments`, 'int'));
+      tasks.push(redis.lrange(`post_${postIds[i]}_recent_comments`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const commentIds = _.flatten(cache);
@@ -97,7 +97,7 @@ async function getTimeline(request) {
   logger.info('user timeline post ids', ids);
 
   const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids), getRecentLikes(ids, decoded.id),
+    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, decoded.id),
     getRecentComments(ids),
   ]);
   const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
@@ -153,11 +153,11 @@ async function unlikeAction(request) {
 async function newComment(request) {
   const { decoded, body } = request;
   const parentId = request.pathParameters.id;
-  const { postId, type, text, marriageId } = body;
+  const { postId, type, text } = body;
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, constants.MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline', { action: 'new-comment', ...resp, marriageId });
+  await snsHelper.pushToSNS('timeline', { action: 'new-comment', ...resp });
   resp.user = user;
   return resp;
 }
