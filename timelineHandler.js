@@ -30,6 +30,7 @@ async function getRecentLikes(ids, type, userId) {
       resp.items = resp.items.filter((k) => k !== null);
       resp.count = resp.items.length;
     }
+    logger.info('cached likes ', resp);
     const missed = [];
     for (let i = 0; i < ids.length; i += 1) {
       if (resp.items.filter((k) => k.parentId === ids[i] && k.userId === userId).length === 0) {
@@ -38,7 +39,7 @@ async function getRecentLikes(ids, type, userId) {
     }
     logger.info('user missed likes', missed);
     if (missed.length > 0) {
-      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed)]);
+      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed, type)]);
       for (let k = 0; k < likes.count; k += 1) {
         const like = likes.items[k];
         like.user = user;
@@ -216,8 +217,9 @@ async function getComments(request) {
     const likes = recentLikes.items.filter((k) => k.parentId === resp.items[i].id);
     resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
     const comments = recentComments.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].comments = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
+    resp.items[i].replies = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
   }
+  logger.info('final response ', JSON.stringify(resp));
   return resp;
 }
 
