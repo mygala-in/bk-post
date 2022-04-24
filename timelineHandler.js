@@ -205,7 +205,7 @@ async function getComments(request) {
   // TODO - check user is authorized to access requested parent
   const [resp, total] = await Promise.all([rdsComments.getComments(parentId, type, page, size), rdsComments.commentsCountsIn([parentId], type)]);
   [resp.total] = total;
-  resp.page = page;
+  resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
   const commentIds = resp.items.map((r) => r.id);
@@ -234,7 +234,7 @@ async function getLikes(request) {
   // TODO - check user is authorized to access requested parent
   const [resp, total] = await Promise.all([rdsLikes.getLikes(parentId, type, page, size), rdsLikes.likesCountsIn([parentId], type)]);
   [resp.total] = total;
-  resp.page = page;
+  resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
   const users = await rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS);
