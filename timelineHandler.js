@@ -203,7 +203,7 @@ async function getComments(request) {
   const { type, page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const [resp, total] = Promise.all([await rdsComments.getComments(parentId, type, page, size), rdsComments.commentsCountsIn([parentId], type)]);
+  const [resp, total] = await Promise.all([rdsComments.getComments(parentId, type, page, size), rdsComments.commentsCountsIn([parentId], type)]);
   [resp.total] = total;
   resp.page = page;
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
