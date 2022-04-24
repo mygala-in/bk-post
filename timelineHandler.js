@@ -200,17 +200,19 @@ async function editComment(request) {
 async function getComments(request) {
   const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { page } = request.queryStringParameters;
+  const { type, page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const resp = await rdsComments.getComments(parentId, page, 15);
+  const [resp, total] = Promise.all([await rdsComments.getComments(parentId, type, page, size), rdsComments.commentsCountsIn([parentId], type)]);
+  [resp.total] = total;
+  resp.page = page;
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const ids = resp.items.map((r) => r.id);
+  const commentIds = resp.items.map((r) => r.id);
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS),
-    rdsLikes.likesCountsIn(ids, 'comment'), rdsComments.commentsCountsIn(ids, 'comment'), getRecentLikes(ids, 'comment', decoded.id),
-    getRecentComments(ids, 'comment'),
+    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds, 'comment', decoded.id),
+    getRecentComments(commentIds, 'comment'),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
     if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
@@ -227,16 +229,19 @@ async function getComments(request) {
 async function getLikes(request) {
   // const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { page } = request.queryStringParameters;
+  const { type, page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const resp = await rdsLikes.getLikes(parentId, page, 15);
+  const [resp, total] = await Promise.all([rdsLikes.getLikes(parentId, type, page, size), rdsLikes.likesCountsIn([parentId], type)]);
+  [resp.total] = total;
+  resp.page = page;
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
   const users = await rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS);
   for (let i = 0; i < resp.count; i += 1) {
     if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
   }
+  logger.info('final response ', JSON.stringify(resp));
   return resp;
 }
 
