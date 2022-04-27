@@ -98,8 +98,10 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsAssets.getPostAssetsIn(constants.ASSET_RESOURCE_TYPES.timeline, ids),
+  const assets = await rdsAssets.getPostAssetsIn(constants.ASSET_RESOURCE_TYPES.timeline, ids);
+  logger.info('total assets ', assets.count);
+
+  const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, 'post', decoded.id),
     getRecentComments(ids, 'post'),
   ]);

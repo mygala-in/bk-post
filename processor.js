@@ -39,6 +39,8 @@ function getRecentCommentsKey(comment) {
 async function savePost(message) {
   logger.info('saving post');
   const { type, userId, assetId } = message;
+  // eslint-disable-next-line no-param-reassign
+  delete message.assetId;
   const [postId, user] = await Promise.all([rdsPosts.queryPost(message), rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS)]);
   if (postId) errors.handleError(409, 'post already exists');
 
@@ -54,7 +56,7 @@ async function savePost(message) {
     case 'marriage.post':
       Object.assign(message, { meta: JSON.stringify({}) });
       ({ insertId } = await rdsPosts.insertPost(message));
-      await Promise.all([rdsPosts.getPost(insertId), rdsAssets.updateAsset(assetId, ASSET_RESOURCE_TYPES.timeline, { postId: insertId })]);
+      await Promise.all([rdsPosts.getPost(insertId), rdsAssets.updateAsset(ASSET_RESOURCE_TYPES.timeline, assetId, { postId: insertId })]);
       break;
 
     default:
