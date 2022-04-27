@@ -7,10 +7,11 @@ const constants = require('./bk-utils/constants');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
+const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS, LIMITS_CONFIG, REDIS_CONFIG } = constants;
+const { MINI_PROFILE_FIELDS, ASSET_RESOURCE_TYPES, LIMITS_CONFIG, REDIS_CONFIG } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
 
 
@@ -37,7 +38,7 @@ function getRecentCommentsKey(comment) {
 
 async function savePost(message) {
   logger.info('saving post');
-  const { type, userId } = message;
+  const { type, userId, assetId } = message;
   const [postId, user] = await Promise.all([rdsPosts.queryPost(message), rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS)]);
   if (postId) errors.handleError(409, 'post already exists');
 
@@ -53,7 +54,7 @@ async function savePost(message) {
     case 'marriage.post':
       Object.assign(message, { meta: JSON.stringify({}) });
       ({ insertId } = await rdsPosts.insertPost(message));
-      await rdsPosts.getPost(insertId);
+      await Promise.all([rdsPosts.getPost(insertId), rdsAssets.updateAsset(assetId, ASSET_RESOURCE_TYPES.timeline, { postId: insertId })]);
       break;
 
     default:

@@ -9,6 +9,7 @@ const snsHelper = require('./bk-utils/sns.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
+const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
 
@@ -97,7 +98,8 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+  const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+    rdsAssets.getPostAssetsIn(constants.ASSET_RESOURCE_TYPES.timeline, ids),
     rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, 'post', decoded.id),
     getRecentComments(ids, 'post'),
   ]);
@@ -110,10 +112,12 @@ async function getTimeline(request) {
   for (let i = 0; i < resp.count; i += 1) {
     if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
     if (resp.items[i].marriageId) [resp.items[i].marriage] = marriages.items.filter((u) => u.id === resp.items[i].marriageId);
-    const likes = recentLikes.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
-    const comments = recentComments.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].comments = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
+    const postLikes = recentLikes.items.filter((k) => k.parentId === resp.items[i].id);
+    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: postLikes, count: postLikes.length };
+    const postComments = recentComments.items.filter((k) => k.parentId === resp.items[i].id);
+    resp.items[i].comments = { type: 'collection', total: totalComments[i] || 0, items: postComments, count: postComments.length };
+    const postAssets = assets.items.filter((k) => k.postId === resp.items[i].id);
+    resp.items[i].assets = { type: 'collection', total: postAssets.length, items: postAssets, count: postAssets.length };
   }
 
   resp.total = total;
