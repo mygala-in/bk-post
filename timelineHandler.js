@@ -12,8 +12,9 @@ const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
+const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-
+const { MARRIAGE_CONFIG, MINI_PROFILE_FIELDS, ASSET_RESOURCE_TYPES } = constants;
 
 async function getRecentLikes(ids, type, userId) {
   const resp = { type: 'collection', count: 0, items: [] };
@@ -40,7 +41,7 @@ async function getRecentLikes(ids, type, userId) {
     }
     logger.info('user missed likes', missed);
     if (missed.length > 0) {
-      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed, type)]);
+      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed, type)]);
       for (let k = 0; k < likes.count; k += 1) {
         const like = likes.items[k];
         like.user = user;
@@ -98,7 +99,7 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const assets = await rdsAssets.getPostAssetsIn(constants.ASSET_RESOURCE_TYPES.timeline, ids);
+  const assets = await rdsAssets.getPostAssetsIn(ASSET_RESOURCE_TYPES.timeline, ids);
   logger.info('total assets ', assets.count);
 
   const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
@@ -109,7 +110,7 @@ async function getTimeline(request) {
   logger.info('marriage ids ', mIds);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const [users, marriages] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS), rdsMarriages.getMarriagesIn(mIds)]);
+  const [users, marriages] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS), rdsMarriages.getMarriagesIn(mIds)]);
 
   for (let i = 0; i < resp.count; i += 1) {
     if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
@@ -128,13 +129,34 @@ async function getTimeline(request) {
 }
 
 
+async function createPost(request) {
+  const { decoded, body } = request;
+
+  let muObj;
+  switch (body.type) {
+    case 'marriage.post':
+      if (!body.marriageId) errors.handleError(400, 'marriageId is required');
+      muObj = await rdsMUsers.getUser(body.marriageId, decoded.id);
+      logger.info('requested user ', muObj);
+      if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested marriage');
+      if (muObj.status !== MARRIAGE_CONFIG.STATUS.verified) errors.handleError(401, 'unauthorized');
+      break;
+
+    default: errors.handleError(400, `unhandled post type ${body.type}`);
+  }
+  const resp = await rdsPosts.insertPost({ userId: decoded.id, ...body });
+  logger.info('final response ', JSON.stringify(resp));
+  return resp;
+}
+
+
 async function likeAction(request) {
   const { decoded, body } = request;
   const parentId = request.pathParameters.id;
   const { postId, type } = body;
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
 
-  const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, constants.MINI_PROFILE_FIELDS)]);
+  const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline', { action: 'like', ...resp });
   resp.user = user;
   return resp;
@@ -163,7 +185,7 @@ async function newComment(request) {
   const { postId, type, text } = body;
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
 
-  const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, constants.MINI_PROFILE_FIELDS)]);
+  const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline', { action: 'new-comment', ...resp });
   resp.user = user;
   return resp;
@@ -216,7 +238,7 @@ async function getComments(request) {
   logger.info('user ids ', uIds);
   const commentIds = resp.items.map((r) => r.id);
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS),
+    rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
     rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds, 'comment', decoded.id),
     getRecentComments(commentIds, 'comment'),
   ]);
@@ -263,6 +285,10 @@ async function invoke(event, context, callback) {
     switch (request.resourcePath) {
       case '/v1/list':
         resp = await getTimeline(request);
+        break;
+
+      case '/v1/new':
+        resp = await createPost(request);
         break;
 
       case '/v1/{id}/like':
