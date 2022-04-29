@@ -99,13 +99,12 @@ async function getTimeline(request) {
   const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
   logger.info('user timeline post ids', ids);
 
-  const assets = await rdsAssets.getPostAssetsIn(ASSET_RESOURCE_TYPES.timeline, ids);
-  logger.info('total assets ', assets.count);
-
-  const [resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+  const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+    rdsAssets.getPostAssetsIn(ASSET_RESOURCE_TYPES.timeline, ids),
     rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, 'post', decoded.id),
     getRecentComments(ids, 'post'),
   ]);
+  logger.info('total assets ', assets.count);
   const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
   logger.info('marriage ids ', mIds);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
@@ -144,7 +143,8 @@ async function createPost(request) {
 
     default: errors.handleError(400, `unhandled post type ${body.type}`);
   }
-  const resp = await rdsPosts.insertPost({ userId: decoded.id, ...body });
+  const { insertId } = await rdsPosts.insertPost({ userId: decoded.id, ...body });
+  const resp = await rdsPosts.getPost(insertId);
   logger.info('final response ', JSON.stringify(resp));
   return resp;
 }
