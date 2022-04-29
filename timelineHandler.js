@@ -157,7 +157,7 @@ async function likeAction(request) {
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline', { action: 'like', ...resp });
+  await snsHelper.pushToSNS('timeline', { action: 'add', component: 'like', ...resp });
   resp.user = user;
   return resp;
 }
@@ -173,7 +173,7 @@ async function unlikeAction(request) {
 
   await Promise.all([
     rdsLikes.deleteLike(id),
-    snsHelper.pushToSNS('timeline', { action: 'unlike', ...like }),
+    snsHelper.pushToSNS('timeline', { action: 'delete', component: 'like', ...like }),
   ]);
   return { success: true };
 }
@@ -186,7 +186,7 @@ async function newComment(request) {
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline', { action: 'new-comment', ...resp });
+  await snsHelper.pushToSNS('timeline', { action: 'add', component: 'comment', ...resp });
   resp.user = user;
   return resp;
 }
@@ -202,7 +202,7 @@ async function deleteComment(request) {
 
   await Promise.all([
     rdsComments.deleteComment(id),
-    snsHelper.pushToSNS('timeline', { action: 'delete-comment', ...comment }),
+    snsHelper.pushToSNS('timeline', { action: 'delete', component: 'comment', ...comment }),
   ]);
   return { success: true };
 }
@@ -218,7 +218,7 @@ async function editComment(request) {
 
   await Promise.all([
     rdsComments.updateComment(id, { ...body }),
-    snsHelper.pushToSNS('timeline', { action: 'edit-comment', ...comment }),
+    snsHelper.pushToSNS('timeline', { action: 'edit', component: 'comment', ...comment }),
   ]);
   Object.assign(comment, body);
   return comment;

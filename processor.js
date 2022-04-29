@@ -7,11 +7,10 @@ const constants = require('./bk-utils/constants');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
-const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MINI_PROFILE_FIELDS, ASSET_RESOURCE_TYPES, LIMITS_CONFIG, REDIS_CONFIG } = constants;
+const { LIMITS_CONFIG, REDIS_CONFIG } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
 
 
@@ -36,61 +35,9 @@ function getRecentCommentsKey(comment) {
 }
 
 
-async function savePost(message) {
-  logger.info('saving post');
-  const { type, userId, assetId } = message;
-  // eslint-disable-next-line no-param-reassign
-  delete message.assetId;
-  const [postId, user] = await Promise.all([rdsPosts.queryPost(message), rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS)]);
-  if (postId) errors.handleError(409, 'post already exists');
-
-  let insertId;
-  switch (type) {
-    case 'marriage.join':
-      // {"marriageId":3,"userId":1, "action": "post", "type":"marriage.join","assetType":"jpg","resourceType":0, "status": "A"}
-      Object.assign(message, { url: user.photo, meta: JSON.stringify({}) });
-      ({ insertId } = await rdsPosts.insertPost(message));
-      await rdsPosts.getPost(insertId);
-      break;
-
-    case 'marriage.post':
-      Object.assign(message, { meta: JSON.stringify({}) });
-      ({ insertId } = await rdsPosts.insertPost(message));
-      await Promise.all([rdsPosts.getPost(insertId), rdsAssets.updateAsset(ASSET_RESOURCE_TYPES.timeline, assetId, { postId: insertId })]);
-      break;
-
-    default:
-      logger.warn(`unhandled post type ${type}`);
-  }
-  return insertId;
-}
-
-
-async function removePost(message) {
-  logger.info('removing post');
-  const { type } = message;
-
-  let postId;
-  switch (type) {
-    case 'marriage.join':
-      postId = await rdsPosts.queryPost(message);
-      break;
-
-    case 'marriage.post':
-      ({ postId } = message.postId);
-      break;
-
-    default:
-  }
-  await rdsPosts.deletePost(postId);
-  return postId;
-}
-
-
-
-async function addToTimelines(postId, message) {
-  const { marriageId } = message;
-  logger.info('adding post to user timelines ', postId, JSON.stringify(message));
+async function newPost(message) {
+  const { id, marriageId } = message;
+  logger.info('adding post to user timelines ', id, JSON.stringify(message));
   const mUsers = await rdsMUsers.getUsers(marriageId);
   const ids = mUsers.items.map((user) => user.userId);
   logger.info('total marriage users ', ids.length);
@@ -98,7 +45,7 @@ async function addToTimelines(postId, message) {
     const key = `user_${ids[i]}_timeline`;
     const exists = await redis.exists(key);
     if (exists) {
-      await redis.zadd(key, postId, postId);
+      await redis.zadd(key, id, id);
       // await redis.expire(key, REDIS_CONFIG.timeline.user);
     } else logger.info('skipping timeline update for ', key);
   }
@@ -106,9 +53,9 @@ async function addToTimelines(postId, message) {
 }
 
 
-async function removeFromTimelines(postId, message) {
-  const { marriageId } = message;
-  logger.info('removing post from user timelines ', postId, JSON.stringify(message));
+async function deletePost(message) {
+  const { id, marriageId } = message;
+  logger.info('removing post from user timelines ', id, JSON.stringify(message));
 
   const mUsers = await rdsMUsers.getUsers(marriageId);
   const ids = mUsers.items.map((user) => user.userId);
@@ -117,7 +64,7 @@ async function removeFromTimelines(postId, message) {
     const key = `user_${ids[i]}_timeline`;
     const exists = await redis.exists(key);
     if (exists) {
-      await redis.zrem(key, postId);
+      await redis.zrem(key, id);
     } else logger.info('skipping timeline update for ', key);
   }
   logger.info('completed removing post from user timelines');
@@ -143,7 +90,7 @@ async function generateTimeline(userId) {
 }
 
 
-async function likeAction(message) {
+async function newLike(message) {
   const { id, userId, postId } = message;
   const [post, like, user] = await Promise.all([rdsPosts.getPost(postId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
   const { marriageId } = post;
@@ -180,7 +127,7 @@ async function likeAction(message) {
 }
 
 
-async function unlikeAction(message) {
+async function deleteLike(message) {
   const { id } = message;
   const like = await rdsLikes.getLike(id);
   await Promise.all([rdsLikes.recountLikes(like.parentId, like.type), redis.del(`like_${id}`)]);
@@ -266,31 +213,42 @@ async function sns(request) {
   try {
     const message = JSON.parse(request.Records[0].Sns.Message);
     logger.info(JSON.stringify(message));
-    const { action } = message;
+    const { action, component } = message;
     delete message.action;
+    delete message.component;
 
+    switch (component) {
+      case 'like':
+        switch (action) {
+          case 'new': return newLike(message);
+          case 'delete': return deleteLike(message);
+          default:
+        }
+        break;
 
-    let id;
-    switch (action) {
+      case 'comment':
+        switch (action) {
+          case 'new': return newComment(message);
+          case 'edit': return editComment(message);
+          case 'delete': return deleteComment(message);
+          default:
+        }
+        break;
+
       case 'post':
-        id = await savePost(message);
-        await addToTimelines(id, message);
+        switch (action) {
+          case 'new': return newPost(message);
+          case 'delete': return deletePost(message);
+          default:
+        }
         break;
-      case 'unpost':
-        id = await removePost(message);
-        await removeFromTimelines(id, message);
-        break;
-      case 'like': await likeAction(message); break;
-      case 'unlike': await unlikeAction(message); break;
-
-      case 'new-comment': await newComment(message); break;
-      case 'edit-comment': await editComment(message); break;
-      case 'delete-comment': await deleteComment(message); break;
       default:
-        logger.warn(`invalid post action ${action}`);
+        return errors.handleError(400, `invalid post component ${component}`);
     }
+    return errors.handleError(400, `invalid post component ${component} & action ${action}`);
   } catch (err) {
     logger.error(err);
+    return { success: false };
   }
 }
 
