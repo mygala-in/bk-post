@@ -86,6 +86,10 @@ functions:
           method: post
           cors: ${self:custom.customCors}
       - http:
+          path: /v1/{id}
+          method: any
+          cors: ${self:custom.customCors}
+      - http:
           path: /v1/{id}/like
           method: any
           cors: ${self:custom.customCors}

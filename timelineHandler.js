@@ -128,9 +128,8 @@ async function getTimeline(request) {
 }
 
 
-async function createPost(request) {
+async function newPost(request) {
   const { decoded, body } = request;
-
   let muObj;
   switch (body.type) {
     case 'marriage.post':
@@ -147,6 +146,31 @@ async function createPost(request) {
   const resp = await rdsPosts.getPost(insertId);
   logger.info('final response ', JSON.stringify(resp));
   return resp;
+}
+
+
+async function updatePost(request) {
+  const { decoded, body } = request;
+  const { id } = request.pathParameters;
+  const post = await rdsPosts.getPost(id);
+  if (_.isEmpty(post)) errors.handleError(404, 'post not found');
+  if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
+  await rdsPosts.updatePost(id, body);
+
+  const resp = await rdsPosts.getPost(id);
+  logger.info('final response ', JSON.stringify(resp));
+  return resp;
+}
+
+
+async function deletePost(request) {
+  const { decoded } = request;
+  const { id } = request.pathParameters;
+  const post = await rdsPosts.getPost(id);
+  if (_.isEmpty(post)) errors.handleError(404, 'post not found');
+  if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
+  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline', { action: 'delete', component: 'post', id, marriageId: post.marriageId })]);
+  return { success: true };
 }
 
 
@@ -288,7 +312,12 @@ async function invoke(event, context, callback) {
         break;
 
       case '/v1/new':
-        resp = await createPost(request);
+        resp = await newPost(request);
+        break;
+
+      case '/v1/{id}':
+        if (request.httpMethod === 'PUT') resp = await updatePost(request);
+        else if (request.httpMethod === 'DELETE') resp = await deletePost(request);
         break;
 
       case '/v1/{id}/like':
