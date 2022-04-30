@@ -220,7 +220,7 @@ async function sns(request) {
     switch (component) {
       case 'like':
         switch (action) {
-          case 'new': return newLike(message);
+          case 'add': return newLike(message);
           case 'delete': return deleteLike(message);
           default:
         }
@@ -228,7 +228,7 @@ async function sns(request) {
 
       case 'comment':
         switch (action) {
-          case 'new': return newComment(message);
+          case 'add': return newComment(message);
           case 'edit': return editComment(message);
           case 'delete': return deleteComment(message);
           default:
@@ -237,7 +237,7 @@ async function sns(request) {
 
       case 'post':
         switch (action) {
-          case 'new': return newPost(message);
+          case 'add': return newPost(message);
           case 'delete': return deletePost(message);
           default:
         }
