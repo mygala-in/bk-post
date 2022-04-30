@@ -81,23 +81,43 @@ async function getRecentComments(ids, type) {
   return resp;
 }
 
+async function postsAfter(key, postId, size) {
+  const total = await redis.zcard(key);
+  logger.info('total timeline items ', total);
+  let rank = await redis.zrank(key, postId);
+  if (rank == null) rank = 0;
+  else rank += 1;
+  logger.info(`rank ${rank}`);
+  const [st, end] = [rank, rank + size - 1];
+  if (st >= total) return [];
+  const ids = await redis.zrange(key, 'int', st, end);
+  return { ids, total };
+}
+
+async function postsBefore(key, postId, size) {
+  const total = await redis.zcard(key);
+  logger.info('total timeline items ', total);
+  let rank = await redis.zrevrank(key, postId);
+  if (rank == null) rank = 0;
+  else rank += 1;
+  logger.info(`rank ${rank}`);
+  const [st, end] = [rank, rank + size - 1];
+  if (st >= total) return [];
+  const ids = await redis.zrevrange(key, 'int', st, end);
+  return { ids, total };
+}
 
 
 async function getTimeline(request) {
   const { decoded } = request;
-  const { postId, size } = request.queryStringParameters;
+  const { postId, size, action } = request.queryStringParameters;
   const key = `user_${decoded.id}_timeline`;
   const exists = await redis.exists(key);
   if (!exists) await processor.generateTimeline(decoded.id);
 
-  let [total, rank] = await Promise.all([redis.zcard(key), redis.zrank(key, postId)]);
-  rank = rank || 0;
-  total = total || 0;
-  logger.info({ total, postId, rank });
-  if (total === 0) return { entity: 'collection', items: [], count: 0, total };
-
-  const ids = await redis.zrange(key, 'int', rank > 0 ? rank + 1 : rank, rank + size > 100 ? 20 : size);
-  logger.info('user timeline post ids', ids);
+  const { ids, total } = (action === 'after') ? await postsAfter(key, postId, size) : await postsBefore(key, postId, size);
+  logger.info('paginated timeline items ', ids);
+  if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsAssets.getPostAssetsIn(ASSET_RESOURCE_TYPES.timeline, ids),
