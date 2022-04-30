@@ -89,7 +89,7 @@ async function postsAfter(key, postId, size) {
   else rank += 1;
   logger.info(`rank ${rank}`);
   const [st, end] = [rank, rank + size - 1];
-  if (st >= total) return [];
+  if (st >= total) return { ids: [], total };
   const ids = await redis.zrange(key, 'int', st, end);
   return { ids, total };
 }
@@ -102,7 +102,7 @@ async function postsBefore(key, postId, size) {
   else rank += 1;
   logger.info(`rank ${rank}`);
   const [st, end] = [rank, rank + size - 1];
-  if (st >= total) return [];
+  if (st >= total) return { ids: [], total };
   const ids = await redis.zrevrange(key, 'int', st, end);
   return { ids, total };
 }
@@ -110,7 +110,10 @@ async function postsBefore(key, postId, size) {
 
 async function getTimeline(request) {
   const { decoded } = request;
-  const { postId, size, action } = request.queryStringParameters;
+  const { action } = request.queryStringParameters;
+  let { postId, size } = request.queryStringParameters;
+  postId = parseInt(postId, 10);
+  size = parseInt(size, 10);
   const key = `user_${decoded.id}_timeline`;
   const exists = await redis.exists(key);
   if (!exists) await processor.generateTimeline(decoded.id);
