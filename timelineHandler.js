@@ -173,6 +173,36 @@ async function deletePost(request) {
   return { success: true };
 }
 
+async function getPost(request) {
+  const { decoded } = request;
+  const { id } = request.pathParameters;
+  const resp = await rdsPosts.getPost(id);
+  if (_.isEmpty(resp)) errors.handleError(404, 'post not found');
+  const { userId, marriageId } = resp;
+  if (marriageId) {
+    const muObj = await rdsMUsers.getUser(marriageId, decoded.id);
+    logger.info('requested user ', muObj);
+    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested marriage');
+    if (muObj.status !== MARRIAGE_CONFIG.STATUS.verified) errors.handleError(401, 'unauthorized');
+  }
+  const tasks = [];
+  tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
+  tasks.push(rdsAssets.getPostAssets(ASSET_RESOURCE_TYPES.timeline, id));
+  tasks.push(rdsLikes.likesCountsIn([id], 'post'));
+  tasks.push(rdsComments.commentsCountsIn([id], 'post'));
+  tasks.push(getRecentLikes([id], 'post', decoded.id));
+  tasks.push(getRecentComments([id], 'post'));
+  if (marriageId) tasks.push(rdsMarriages.getMarriage(marriageId));
+  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, marriage] = await Promise.all(tasks);
+  resp.user = user;
+  resp.assets = assets;
+  resp.likes = { type: 'collection', total: totalLikes[0], items: recentLikes.items, count: recentLikes.items.length };
+  resp.comments = { type: 'collection', total: totalComments[0], items: recentComments.items, count: recentComments.items.length };
+  if (marriage) resp.marriage = marriage;
+  logger.info('final response ', JSON.stringify(resp));
+  return resp;
+}
+
 
 async function likeAction(request) {
   const { decoded, body } = request;
@@ -316,8 +346,12 @@ async function invoke(event, context, callback) {
         break;
 
       case '/v1/{id}':
-        if (request.httpMethod === 'PUT') resp = await updatePost(request);
-        else if (request.httpMethod === 'DELETE') resp = await deletePost(request);
+        switch (request.httpMethod) {
+          case 'GET': resp = await getPost(request); break;
+          case 'PUT': resp = await updatePost(request); break;
+          case 'DELETE': resp = await deletePost(request); break;
+          default: errors.handleError(400, 'invalid request method');
+        }
         break;
 
       case '/v1/{id}/like':
