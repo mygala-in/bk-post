@@ -2,15 +2,17 @@
 const _ = require('underscore');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
+const common = require('./bk-utils/common');
 const redis = require('./bk-utils/redis.helper');
 const constants = require('./bk-utils/constants');
+const snsHelper = require('./bk-utils/sns.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { LIMITS_CONFIG, REDIS_CONFIG } = constants;
+const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS } = constants;
 const { STATUS } = constants.MARRIAGE_CONFIG;
 
 
@@ -108,6 +110,20 @@ async function newLike(message) {
 
   await rdsLikes.recountLikes(like.parentId, like.type);
 
+  switch (like.type) {
+    case 'post':
+      await snsHelper.pushToSNS('fcm', {
+        id: `${like.id}`,
+        type: 'default',
+        title: `${user.username ?? user.name} liked your post.`,
+        topic: common.getTopicName('user', post.userId),
+        groupId: APP_NOTIFICATIONS.channels.post,
+        payload: { arguments: `${postId}`, userId: like.userId, screen: '/post-screen' },
+      });
+      break;
+    default:
+  }
+
   const key = getRecentLikesKey(like);
   logger.info('recent likes key ', key);
   if (!key) return;
@@ -154,6 +170,20 @@ async function newComment(message) {
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
   await rdsComments.recountComments(comment.parentId, comment.type);
+
+  switch (comment.type) {
+    case 'post':
+      await snsHelper.pushToSNS('fcm', {
+        id: `${comment.id}`,
+        type: 'default',
+        title: `${user.username ?? user.name} commented on your post.`,
+        topic: common.getTopicName('user', post.userId),
+        groupId: APP_NOTIFICATIONS.channels.post,
+        payload: { arguments: `${postId}`, userId: comment.userId, screen: '/post-screen' },
+      });
+      break;
+    default:
+  }
 
   const key = getRecentCommentsKey(comment);
   logger.info('recent comments key ', key);
