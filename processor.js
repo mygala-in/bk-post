@@ -38,10 +38,10 @@ function getRecentCommentsKey(comment) {
 
 
 async function newPost(message) {
-  const { id, marriageId } = message;
+  const { id, marriageId, userId } = message;
   logger.info('adding post to user timelines ', id, JSON.stringify(message));
-  const mUsers = await rdsMUsers.getUsers(marriageId);
-  const ids = mUsers.items.map((user) => user.userId);
+  const [mUsers, user] = await Promise.all([rdsMUsers.getUsers(marriageId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
+  const ids = mUsers.items.map((u) => u.userId);
   logger.info('total marriage users ', ids.length);
   for (let i = 0; i < ids.length; i += 1) {
     const key = `user_${ids[i]}_timeline`;
@@ -51,6 +51,14 @@ async function newPost(message) {
       // await redis.expire(key, REDIS_CONFIG.timeline.user);
     } else logger.info('skipping timeline update for ', key);
   }
+  await snsHelper.pushToSNS('fcm', {
+    id: `${id}`,
+    type: 'default',
+    title: `${user.username ?? user.name} added a new post.`,
+    topic: common.getTopicName('marriage', marriageId),
+    groupId: APP_NOTIFICATIONS.channels.profile,
+    payload: { arguments: id, userId, screen: '/post-screen' },
+  });
   logger.info('completed adding post to user timelines');
 }
 
