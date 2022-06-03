@@ -51,16 +51,19 @@ async function newPost(message) {
       // await redis.expire(key, REDIS_CONFIG.timeline.user);
     } else logger.info('skipping timeline update for ', key);
   }
-  let title;
+  let title = '';
+  logger.info(`post type :: ${post.type}`);
   switch (post.type) {
     case 'marriage.post':
       title = `${user.username ?? user.name} added a new post.`;
       break;
     case 'marriage.join':
       title = `${user.username ?? user.name} joined the marriage.`;
+      await redis.del(`marriage_${marriageId}_bg_count`);
       break;
     default:
   }
+  logger.info(`title :: ${title}`);
   await snsHelper.pushToSNS('fcm', {
     id: `${id}`,
     type: 'default',
