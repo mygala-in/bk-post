@@ -113,6 +113,44 @@ async function generateTimeline(userId) {
 }
 
 
+async function userJoined(message) {
+  const { userId, marriageId } = message;
+  logger.info('started adding marriage posts to user timeline ', { marriageId, userId });
+  const key = `user_${userId}_timeline`;
+  const exists = await redis.exists(key);
+  if (!exists) {
+    logger.info('user timeline does not exist, skipping action');
+    return;
+  }
+  const postIds = await rdsPosts.getMarriagePostIds([marriageId]);
+  logger.info('total posts ', postIds.count);
+  const tasks = [];
+  for (let i = 0; i < postIds.count; i += 1) {
+    const id = postIds.items[i];
+    tasks.push(redis.zadd(key, id, id));
+  }
+  await Promise.all(tasks);
+  await redis.expire(key, REDIS_CONFIG.timeline.user);
+  logger.info('completed adding marriage posts to user timeline');
+}
+
+
+async function userExited(message) {
+  const { userId, marriageId } = message;
+  logger.info('started removing marriage posts to user timeline ', { marriageId, userId });
+  const key = `user_${userId}_timeline`;
+  const exists = await redis.exists(key);
+  if (!exists) {
+    logger.info('user timeline does not exist, skipping action');
+    return;
+  }
+  const postIds = await rdsPosts.getMarriagePostIds([marriageId]);
+  logger.info('total posts ', postIds.count);
+  await redis.zrem(key, postIds.items);
+  logger.info('completed removing marriage posts to user timeline');
+}
+
+
 async function newLike(message) {
   const { id, userId, postId } = message;
   const [post, like, user] = await Promise.all([rdsPosts.getPost(postId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
@@ -290,6 +328,14 @@ async function sns(request) {
         switch (action) {
           case 'add': return newPost(message);
           case 'delete': return deletePost(message);
+          default:
+        }
+        break;
+
+      case 'marriage':
+        switch (action) {
+          case 'join': return userJoined(message);
+          case 'exit': return userExited(message);
           default:
         }
         break;
