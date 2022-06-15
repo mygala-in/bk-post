@@ -107,6 +107,28 @@ async function postsBefore(key, postId, size) {
   return { ids, total };
 }
 
+async function recentPosts(key, size) {
+  const total = await redis.zcard(key);
+  logger.info('total timeline items ', total);
+  const [st, end] = [0, size - 1];
+  const ids = await redis.zrevrange(key, 'int', st, end);
+  return { ids, total };
+}
+
+
+async function timelinePosts(action, key, postId, size) {
+  switch (action) {
+    case 'recent':
+      return recentPosts(key, size);
+    case 'after':
+      return postsAfter(key, postId, size);
+    case 'before':
+      return postsBefore(key, postId, size);
+    default:
+      return { ids: [], total: 0 };
+  }
+}
+
 
 async function getTimeline(request) {
   const { decoded } = request;
@@ -118,7 +140,7 @@ async function getTimeline(request) {
   const exists = await redis.exists(key);
   if (!exists) await processor.generateTimeline(decoded.id);
 
-  const { ids, total } = (action === 'after') ? await postsAfter(key, postId, size) : await postsBefore(key, postId, size);
+  const { ids, total } = await timelinePosts(action, key, postId, size);
   logger.info('paginated timeline items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
