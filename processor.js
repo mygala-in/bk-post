@@ -59,7 +59,6 @@ async function newPost(message) {
       break;
     case 'marriage.join':
       title = `${user.username ?? user.name} joined the marriage.`;
-      await redis.del(`marriage_${marriageId}_bg_count`);
       break;
     default:
   }
