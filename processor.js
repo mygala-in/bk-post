@@ -76,8 +76,8 @@ async function newPost(message) {
 
 
 async function deletePost(message) {
-  const { id, marriageId } = message;
-  logger.info('removing post from user timelines ', id, JSON.stringify(message));
+  const { postId, marriageId } = message;
+  logger.info('removing post from user timelines ', postId, JSON.stringify(message));
 
   const mUsers = await rdsMUsers.getUsers(marriageId);
   const ids = mUsers.items.map((user) => user.userId);
@@ -86,7 +86,7 @@ async function deletePost(message) {
     const key = `user_${ids[i]}_timeline`;
     const exists = await redis.exists(key);
     if (exists) {
-      await redis.zrem(key, id);
+      await redis.zrem(key, postId);
     } else logger.info('skipping timeline update for ', key);
   }
   logger.info('completed removing post from user timelines');

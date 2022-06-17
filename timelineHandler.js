@@ -214,7 +214,7 @@ async function deletePost(request) {
   const post = await rdsPosts.getPost(id);
   if (_.isEmpty(post)) errors.handleError(404, 'post not found');
   if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
-  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline', { action: 'delete', component: 'post', id, marriageId: post.marriageId })]);
+  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline', { action: 'delete', component: 'post', postId: id, marriageId: post.marriageId })]);
   return { success: true };
 }
 
