@@ -136,17 +136,34 @@ async function userJoined(message) {
 
 async function userExited(message) {
   const { userId, marriageId } = message;
-  logger.info('started removing marriage posts to user timeline ', { marriageId, userId });
-  const key = `user_${userId}_timeline`;
-  const exists = await redis.exists(key);
-  if (!exists) {
-    logger.info('user timeline does not exist, skipping action');
-    return;
+  logger.info('started removing marriage posts from user timeline ', { marriageId, userId });
+  let key = `user_${userId}_timeline`;
+  let exists = await redis.exists(key);
+  if (!exists) logger.info('user timeline does not exist, skipping action');
+  else {
+    const postIds = await rdsPosts.getMarriagePostIds([marriageId]);
+    logger.info('total marriage posts ', postIds.count);
+    await redis.zrem(key, postIds.items);
+    logger.info('completed removing marriage posts from user timeline');
   }
-  const postIds = await rdsPosts.getMarriagePostIds([marriageId]);
-  logger.info('total posts ', postIds.count);
-  await redis.zrem(key, postIds.items);
-  logger.info('completed removing marriage posts to user timeline');
+
+  logger.info('started removing user posts from all marriage users');
+  const postIds = await rdsPosts.getMarriageUserPostIds(marriageId, userId);
+  logger.info('total user posts ', postIds.count);
+  await rdsPosts.deletePosts(postIds.items);
+
+  const mUsers = await rdsMUsers.getUsers(marriageId);
+  const userIds = mUsers.items.map((user) => user.userId);
+  logger.info('total marriage users ', userIds.length);
+
+  for (let k = 0; k < userIds.length; k += 1) {
+    key = `user_${userIds[k]}_timeline`;
+    exists = await redis.exists(key);
+    if (exists) {
+      await redis.zrem(key, postIds.items);
+    } else logger.info('skipping timeline update for ', key);
+  }
+  logger.info('completed removing user posts from all marriage users');
 }
 
 
