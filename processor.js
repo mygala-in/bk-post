@@ -150,6 +150,8 @@ async function userExited(message) {
   logger.info('started removing user posts from all marriage users');
   const postIds = await rdsPosts.getMarriageUserPostIds(marriageId, userId);
   logger.info('total user posts ', postIds.count);
+  await rdsPosts.deletePosts(postIds.items);
+
   const mUsers = await rdsMUsers.getUsers(marriageId);
   const userIds = mUsers.items.map((user) => user.userId);
   logger.info('total marriage users ', userIds.length);
