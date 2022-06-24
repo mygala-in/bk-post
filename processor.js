@@ -156,15 +156,12 @@ async function userExited(message) {
   const userIds = mUsers.items.map((user) => user.userId);
   logger.info('total marriage users ', userIds.length);
 
-  for (let i = 0; i < postIds.count; i += 1) {
-    const postId = postIds.items[i];
-    for (let k = 0; k < userIds.length; k += 1) {
-      key = `user_${userIds[k]}_timeline`;
-      exists = await redis.exists(key);
-      if (exists) {
-        await redis.zrem(key, postId);
-      } else logger.info('skipping timeline update for ', key);
-    }
+  for (let k = 0; k < userIds.length; k += 1) {
+    key = `user_${userIds[k]}_timeline`;
+    exists = await redis.exists(key);
+    if (exists) {
+      await redis.zrem(key, postIds.items);
+    } else logger.info('skipping timeline update for ', key);
   }
   logger.info('completed removing user posts from all marriage users');
 }
