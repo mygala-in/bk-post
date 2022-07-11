@@ -69,7 +69,7 @@ async function newPost(message) {
     title,
     topic: common.getTopicName('marriage', marriageId),
     groupId: APP_NOTIFICATIONS.channels.profile,
-    payload: { arguments: postId, userId, screen: '/post-screen' },
+    payload: { screen: '/post-screen', args: { postId, useCache: false } },
   });
   logger.info('completed adding post to user timelines');
 }
@@ -193,7 +193,7 @@ async function newLike(message) {
         title: `${user.username ?? user.name} liked your post.`,
         topic: common.getTopicName('user', post.userId),
         groupId: APP_NOTIFICATIONS.channels.post,
-        payload: { arguments: `${postId}`, userId: like.userId, screen: '/post-screen' },
+        payload: { screen: '/post-screen', args: { postId, useCache: false } },
       });
       break;
     default:
@@ -254,7 +254,7 @@ async function newComment(message) {
         title: `${user.username ?? user.name} commented on your post.`,
         topic: common.getTopicName('user', post.userId),
         groupId: APP_NOTIFICATIONS.channels.post,
-        payload: { arguments: `${postId}`, userId: comment.userId, screen: '/post-screen' },
+        payload: { screen: '/post-screen', args: { postId, useCache: false } },
       });
       break;
     default:
