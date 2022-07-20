@@ -73,7 +73,7 @@ functions:
     name: ${self:custom.config.envPrefix}-timeline-bg-tasks
     handler: processor.sns
     events:
-      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline
+      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline-bg-tasks
   timeline-apis:
     name: ${self:custom.config.envPrefix}-timeline-apis
     handler: timelineHandler.invoke
@@ -113,7 +113,7 @@ resources:
     isProd: {"Fn::Equals" : ["${self:provider.stage}", "prod"]}
     isDev: {"Fn::Equals" : ["${self:provider.stage}", "dev"]}
   Resources:
-    TimelineSNS:
+    TimelineBgTasksSNS:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: ${self:custom.config.envPrefix}-timeline
+        TopicName: ${self:custom.config.envPrefix}-timeline-bg-tasks
