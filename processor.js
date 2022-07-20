@@ -77,19 +77,19 @@ async function newPost(message) {
 
 async function deletePost(message) {
   const { postId, marriageId } = message;
-  let { users } = message;
+  let { userIds } = message;
   logger.info('removing post from user timelines ', postId, JSON.stringify(message));
 
-  if (users) {
-    logger.info('using users from request ', users.length);
+  if (userIds) {
+    logger.info('using users from request ', userIds.length);
   } else {
     const mUsers = await rdsMUsers.getUsers(marriageId);
-    users = mUsers.items.map((user) => user.userId);
-    logger.info('total marriage users ', users.length);
+    userIds = mUsers.items.map((user) => user.userId);
+    logger.info('total marriage users ', userIds.length);
   }
 
-  for (let i = 0; i < users.length; i += 1) {
-    const key = `user_${users[i]}_timeline`;
+  for (let i = 0; i < userIds.length; i += 1) {
+    const key = `user_${userIds[i]}_timeline`;
     const exists = await redis.exists(key);
     if (exists) {
       await redis.zrem(key, postId);
