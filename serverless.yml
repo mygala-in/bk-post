@@ -68,8 +68,9 @@ provider:
     rdsSecretArn: ${self:custom.config.rdsSecretArn}
 
 functions:
-  timeline-events:
-    name: ${self:custom.config.envPrefix}-timeline-events
+  timeline-bg-tasks:
+    timeout: 60
+    name: ${self:custom.config.envPrefix}-timeline-bg-tasks
     handler: processor.sns
     events:
       - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline
