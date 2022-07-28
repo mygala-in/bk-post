@@ -63,14 +63,16 @@ async function newPost(message) {
     default:
   }
   logger.info(`title :: ${title}`);
-  await snsHelper.pushToSNS('fcm', {
-    id: `${postId}`,
-    type: 'default',
-    title,
-    topic: common.getTopicName('marriage', marriageId),
-    groupId: APP_NOTIFICATIONS.channels.profile,
-    payload: { screen: '/post-screen', args: { postId, useCache: false } },
-  });
+  await snsHelper.pushToSNS('fcm', { service: 'notification',
+    component: 'notification',
+    action: 'new',
+    data: { id: `${postId}`,
+      type: 'default',
+      title,
+      topic: common.getTopicName('marriage', marriageId),
+      groupId: APP_NOTIFICATIONS.channels.profile,
+      payload: { screen: '/post-screen', args: { postId, useCache: false } },
+    } });
   logger.info('completed adding post to user timelines');
 }
 
@@ -193,14 +195,17 @@ async function newLike(message) {
 
   switch (like.type) {
     case 'post':
-      await snsHelper.pushToSNS('fcm', {
-        id: `${like.id}`,
-        type: 'default',
-        title: `${user.username ?? user.name} liked your post.`,
-        topic: common.getTopicName('user', post.userId),
-        groupId: APP_NOTIFICATIONS.channels.post,
-        payload: { screen: '/post-screen', args: { postId, useCache: false } },
-      });
+      await snsHelper.pushToSNS('fcm', { service: 'notification',
+        component: 'notification',
+        action: 'new',
+        data: {
+          id: `${like.id}`,
+          type: 'default',
+          title: `${user.username ?? user.name} liked your post.`,
+          topic: common.getTopicName('user', post.userId),
+          groupId: APP_NOTIFICATIONS.channels.post,
+          payload: { screen: '/post-screen', args: { postId, useCache: false } },
+        } });
       break;
     default:
   }
@@ -254,14 +259,17 @@ async function newComment(message) {
 
   switch (comment.type) {
     case 'post':
-      await snsHelper.pushToSNS('fcm', {
-        id: `${comment.id}`,
-        type: 'default',
-        title: `${user.username ?? user.name} commented on your post.`,
-        topic: common.getTopicName('user', post.userId),
-        groupId: APP_NOTIFICATIONS.channels.post,
-        payload: { screen: '/post-screen', args: { postId, useCache: false } },
-      });
+      await snsHelper.pushToSNS('fcm', { service: 'notification',
+        component: 'notification',
+        action: 'new',
+        data: {
+          id: `${comment.id}`,
+          type: 'default',
+          title: `${user.username ?? user.name} commented on your post.`,
+          topic: common.getTopicName('user', post.userId),
+          groupId: APP_NOTIFICATIONS.channels.post,
+          payload: { screen: '/post-screen', args: { postId, useCache: false } },
+        } });
       break;
     default:
   }
@@ -319,52 +327,51 @@ async function deleteComment(message) {
 }
 
 async function sns(request) {
-  logger.info('received timeline event sns');
+  logger.info('received timeline processor sns event');
   logger.info(JSON.stringify(request));
   try {
     const message = JSON.parse(request.Records[0].Sns.Message);
     logger.info(JSON.stringify(message));
-    const { action, component } = message;
-    delete message.action;
-    delete message.component;
+    const { service, action, component, data } = message;
+    if (service !== 'timeline') errors.handleError(400, `invalid service event ${service}, sent for timeline processor`);
 
     switch (component) {
       case 'like':
         switch (action) {
-          case 'add': return newLike(message);
-          case 'delete': return deleteLike(message);
+          case 'add': return newLike(data);
+          case 'delete': return deleteLike(data);
           default:
         }
         break;
 
       case 'comment':
         switch (action) {
-          case 'add': return newComment(message);
-          case 'edit': return editComment(message);
-          case 'delete': return deleteComment(message);
+          case 'add': return newComment(data);
+          case 'edit': return editComment(data);
+          case 'delete': return deleteComment(data);
           default:
         }
         break;
 
       case 'post':
         switch (action) {
-          case 'add': return newPost(message);
-          case 'delete': return deletePost(message);
+          case 'add': return newPost(data);
+          case 'delete': return deletePost(data);
           default:
         }
         break;
 
       case 'marriage':
         switch (action) {
-          case 'join': return userJoined(message);
-          case 'exit': return userExited(message);
+          case 'join': return userJoined(data);
+          case 'exit': return userExited(data);
           default:
         }
         break;
       default:
-        return errors.handleError(400, `invalid post component ${component}`);
+        return errors.handleError(400, `invalid component ${component}`);
     }
-    return errors.handleError(400, `invalid post component ${component} & action ${action}`);
+    return errors.handleError(400, `invalid component ${component} & action ${action}`);
   } catch (err) {
     logger.error(err);
     return { success: false };

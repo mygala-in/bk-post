@@ -214,7 +214,7 @@ async function deletePost(request) {
   const post = await rdsPosts.getPost(id);
   if (_.isEmpty(post)) errors.handleError(404, 'post not found');
   if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
-  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline-bg-tasks', { action: 'delete', component: 'post', postId: id, marriageId: post.marriageId })]);
+  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'post', action: 'delete', data: { postId: id, marriageId: post.marriageId } })]);
   return { success: true };
 }
 
@@ -256,7 +256,7 @@ async function likeAction(request) {
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline-bg-tasks', { action: 'add', component: 'like', ...resp });
+  await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'add', data: resp });
   resp.user = user;
   return resp;
 }
@@ -272,7 +272,7 @@ async function unlikeAction(request) {
 
   await Promise.all([
     rdsLikes.deleteLike(id),
-    snsHelper.pushToSNS('timeline-bg-tasks', { action: 'delete', component: 'like', ...like }),
+    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'delete', data: like }),
   ]);
   return { success: true };
 }
@@ -285,7 +285,7 @@ async function newComment(request) {
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline-bg-tasks', { action: 'add', component: 'comment', ...resp });
+  await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'add', data: resp });
   resp.user = user;
   return resp;
 }
@@ -301,7 +301,7 @@ async function deleteComment(request) {
 
   await Promise.all([
     rdsComments.deleteComment(id),
-    snsHelper.pushToSNS('timeline-bg-tasks', { action: 'delete', component: 'comment', ...comment }),
+    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'delete', data: comment }),
   ]);
   return { success: true };
 }
@@ -317,7 +317,7 @@ async function editComment(request) {
 
   await Promise.all([
     rdsComments.updateComment(id, { ...body }),
-    snsHelper.pushToSNS('timeline-bg-tasks', { action: 'edit', component: 'comment', ...comment }),
+    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'edit', data: comment }),
   ]);
   Object.assign(comment, body);
   return comment;
