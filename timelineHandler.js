@@ -166,9 +166,7 @@ async function getTimeline(request) {
     const postAssets = assets.items.filter((k) => k.postId === resp.items[i].id);
     resp.items[i].assets = { type: 'collection', total: postAssets.length, items: postAssets, count: postAssets.length };
   }
-
   resp.total = total;
-  logger.info('final timeline ', JSON.stringify(resp));
   return resp;
 }
 
@@ -188,9 +186,7 @@ async function newPost(request) {
     default: errors.handleError(400, `unhandled post type ${body.type}`);
   }
   const { insertId } = await rdsPosts.insertPost({ userId: decoded.id, ...body });
-  const resp = await rdsPosts.getPost(insertId);
-  logger.info('final response ', JSON.stringify(resp));
-  return resp;
+  return rdsPosts.getPost(insertId);
 }
 
 
@@ -201,10 +197,7 @@ async function updatePost(request) {
   if (_.isEmpty(post)) errors.handleError(404, 'post not found');
   if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
   await rdsPosts.updatePost(id, body);
-
-  const resp = await rdsPosts.getPost(id);
-  logger.info('final response ', JSON.stringify(resp));
-  return resp;
+  return rdsPosts.getPost(id);
 }
 
 
@@ -244,7 +237,6 @@ async function getPost(request) {
   resp.likes = { type: 'collection', total: totalLikes[0], items: recentLikes.items, count: recentLikes.items.length };
   resp.comments = { type: 'collection', total: totalComments[0], items: recentComments.items, count: recentComments.items.length };
   if (marriage) resp.marriage = marriage;
-  logger.info('final response ', JSON.stringify(resp));
   return resp;
 }
 
@@ -348,7 +340,6 @@ async function getComments(request) {
     const comments = recentComments.items.filter((k) => k.parentId === resp.items[i].id);
     resp.items[i].replies = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
   }
-  logger.info('final response ', JSON.stringify(resp));
   return resp;
 }
 
@@ -368,7 +359,6 @@ async function getLikes(request) {
   for (let i = 0; i < resp.count; i += 1) {
     if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
   }
-  logger.info('final response ', JSON.stringify(resp));
   return resp;
 }
 
@@ -430,6 +420,7 @@ async function invoke(event, context, callback) {
       default: errors.handleError(400, 'invalid request path');
     }
     context.callbackWaitsForEmptyEventLoop = false;
+    logger.info('final response ', JSON.stringify(resp));
     return callback(null, { statusCode: 200, headers, body: JSON.stringify(resp) });
   } catch (err) {
     context.callbackWaitsForEmptyEventLoop = false;
