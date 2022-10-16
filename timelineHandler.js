@@ -14,7 +14,7 @@ const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { MARRIAGE_CONFIG, MINI_PROFILE_FIELDS, ASSET_RESOURCE_TYPES } = constants;
+const { MARRIAGE_CONFIG, MINI_PROFILE_FIELDS } = constants;
 
 async function getRecentLikes(ids, type, userId) {
   const resp = { type: 'collection', count: 0, items: [] };
@@ -145,7 +145,7 @@ async function getTimeline(request) {
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsAssets.getPostAssetsIn(ASSET_RESOURCE_TYPES.timeline, ids),
+    rdsAssets.getParentAssetsIn(ids.map((id) => `post_${id}`)),
     rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, 'post', decoded.id),
     getRecentComments(ids, 'post'),
   ]);
@@ -157,14 +157,16 @@ async function getTimeline(request) {
   const [users, marriages] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS), rdsMarriages.getMarriagesIn(mIds)]);
 
   for (let i = 0; i < resp.count; i += 1) {
-    if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
-    if (resp.items[i].marriageId) [resp.items[i].marriage] = marriages.items.filter((u) => u.id === resp.items[i].marriageId);
-    const postLikes = recentLikes.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: postLikes, count: postLikes.length };
-    const postComments = recentComments.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].comments = { type: 'collection', total: totalComments[i] || 0, items: postComments, count: postComments.length };
-    const postAssets = assets.items.filter((k) => k.postId === resp.items[i].id);
-    resp.items[i].assets = { type: 'collection', total: postAssets.length, items: postAssets, count: postAssets.length };
+    const post = resp.items[i];
+    if (post.userId) [post.user] = users.items.filter((u) => u.id === post.userId);
+    if (post.marriageId) [post.marriage] = marriages.items.filter((u) => u.id === post.marriageId);
+    const pLikes = recentLikes.items.filter((k) => k.parentId === post.id);
+    post.likes = { type: 'collection', total: totalLikes[i] || 0, items: pLikes, count: pLikes.length };
+    const pComments = recentComments.items.filter((k) => k.parentId === post.id);
+    post.comments = { type: 'collection', total: totalComments[i] || 0, items: pComments, count: pComments.length };
+    const pAssets = assets.items.filter((k) => k.parentId === `post_${post.id}`);
+    post.assets = { type: 'collection', total: pAssets.length, items: pAssets, count: pAssets.length };
+    resp.items[i] = post;
   }
   resp.total = total;
   return resp;
@@ -225,7 +227,7 @@ async function getPost(request) {
   }
   const tasks = [];
   tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
-  tasks.push(rdsAssets.getPostAssets(ASSET_RESOURCE_TYPES.timeline, id));
+  tasks.push(rdsAssets.getParentAssets(`post_${id}`));
   tasks.push(rdsLikes.likesCountsIn([id], 'post'));
   tasks.push(rdsComments.commentsCountsIn([id], 'post'));
   tasks.push(getRecentLikes([id], 'post', decoded.id));
@@ -334,11 +336,13 @@ async function getComments(request) {
     getRecentComments(commentIds, 'comment'),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
-    if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
-    const likes = recentLikes.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
-    const comments = recentComments.items.filter((k) => k.parentId === resp.items[i].id);
-    resp.items[i].replies = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
+    const comment = resp.items[i];
+    if (comment.userId) [comment.user] = users.items.filter((u) => u.id === comment.userId);
+    const likes = recentLikes.items.filter((k) => k.parentId === comment.id);
+    comment.likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
+    const comments = recentComments.items.filter((k) => k.parentId === comment.id);
+    comment.replies = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
+    resp.items[i] = comment;
   }
   return resp;
 }
@@ -357,7 +361,9 @@ async function getLikes(request) {
   logger.info('user ids ', uIds);
   const users = await rdsUsers.getUserFieldsIn(uIds, constants.MINI_PROFILE_FIELDS);
   for (let i = 0; i < resp.count; i += 1) {
-    if (resp.items[i].userId) [resp.items[i].user] = users.items.filter((u) => u.id === resp.items[i].userId);
+    const like = resp.items[i];
+    if (like.userId) [like.user] = users.items.filter((u) => u.id === like.userId);
+    resp.items[i] = like;
   }
   return resp;
 }
