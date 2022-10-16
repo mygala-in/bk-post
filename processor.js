@@ -12,8 +12,7 @@ const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
-const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS } = constants;
-const { STATUS } = constants.MARRIAGE_CONFIG;
+const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, MARRIAGE_CONFIG } = constants;
 
 
 function getRecentLikesKey(like) {
@@ -104,7 +103,7 @@ async function deletePost(message) {
 async function generateTimeline(userId) {
   logger.info('started generating timeline for user ', userId);
   const mJoins = await rdsMUsers.getMarriages(userId);
-  const vIds = mJoins.items.filter((i) => i.status === STATUS.verified).map((i) => i.marriageId);
+  const vIds = mJoins.items.filter((i) => i.status === MARRIAGE_CONFIG.status.verified).map((i) => i.marriageId);
   logger.info('verified marriage ids ', vIds);
 
   const postIds = await rdsPosts.getMarriagePostIds(vIds);
@@ -182,7 +181,7 @@ async function newLike(message) {
   if (marriageId) {
     const muObj = await rdsMUsers.getUser(marriageId, userId);
     logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
+    if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(post)) {
       logger.warn('unauthorized like action');
       await rdsLikes.deleteLike(id);
       return;
@@ -246,7 +245,7 @@ async function newComment(message) {
   if (marriageId) {
     const muObj = await rdsMUsers.getUser(marriageId, userId);
     logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj) || muObj.status !== STATUS.verified || _.isEmpty(post)) {
+    if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(post)) {
       logger.warn('unauthorized comment action');
       await rdsComments.deleteComment(id);
       return;
