@@ -182,7 +182,7 @@ async function newPost(request) {
       muObj = await rdsMUsers.getUser(body.marriageId, decoded.id);
       logger.info('requested user ', muObj);
       if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested marriage');
-      if (muObj.status !== MARRIAGE_CONFIG.STATUS.verified) errors.handleError(401, 'unauthorized');
+      if (muObj.status !== MARRIAGE_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
       break;
 
     default: errors.handleError(400, `unhandled post type ${body.type}`);
@@ -223,7 +223,7 @@ async function getPost(request) {
     const muObj = await rdsMUsers.getUser(marriageId, decoded.id);
     logger.info('requested user ', muObj);
     if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested marriage');
-    if (muObj.status !== MARRIAGE_CONFIG.STATUS.verified) errors.handleError(401, 'unauthorized');
+    if (muObj.status !== MARRIAGE_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
   }
   const tasks = [];
   tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
