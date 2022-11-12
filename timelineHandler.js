@@ -349,9 +349,9 @@ async function getComments(request) {
   for (let i = 0; i < resp.count; i += 1) {
     const comment = resp.items[i];
     if (comment.userId) [comment.user] = users.items.filter((u) => u.id === comment.userId);
-    const likes = recentLikes.items.filter((k) => k.parentId === comment.id);
+    const likes = recentLikes.items.filter((k) => k.parentId === `comment_${comment.id}`);
     comment.likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
-    const comments = recentComments.items.filter((k) => k.parentId === comment.id);
+    const comments = recentComments.items.filter((k) => k.parentId === `comment_${comment.id}`);
     comment.replies = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
     resp.items[i] = comment;
   }
