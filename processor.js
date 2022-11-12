@@ -16,23 +16,11 @@ const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, MARRIAGE_CONFIG } = cons
 
 
 function getRecentLikesKey(like) {
-  const postfix = 'recent_likes';
-  const { parentId, postId, type } = like;
-  switch (type) {
-    case 'post': return `post_${postId}_${postfix}`;
-    case 'comment': return `comment_${parentId}_${postfix}`;
-    default: return null;
-  }
+  return `${like.parentId}_recent_likes`;
 }
 
 function getRecentCommentsKey(comment) {
-  const postfix = 'recent_comments';
-  const { parentId, postId, type } = comment;
-  switch (type) {
-    case 'post': return `post_${postId}_${postfix}`;
-    case 'comment': return `comment_${parentId}_${postfix}`;
-    default: return null;
-  }
+  return `${comment.parentId}_recent_comments`;
 }
 
 
