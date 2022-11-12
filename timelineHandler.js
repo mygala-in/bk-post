@@ -244,10 +244,9 @@ async function getPost(request) {
 
 
 async function likeAction(request) {
-  const { decoded, body } = request;
+  const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { postId, type } = body;
-  const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
+  const { insertId } = await rdsLikes.saveLike({ parentId, creatorId: decoded.id, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'add', data: resp });
@@ -321,10 +320,10 @@ async function editComment(request) {
 async function getComments(request) {
   const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { type, page, size } = request.queryStringParameters;
+  const { page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const [resp, total] = await Promise.all([rdsComments.getComments(parentId, type, page, size), rdsComments.commentsCountsIn([parentId], type)]);
+  const [resp, total] = await Promise.all([rdsComments.getComments(parentId, page, size), rdsComments.commentsCountsIn([parentId])]);
   [resp.total] = total;
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
