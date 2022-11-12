@@ -163,8 +163,11 @@ async function userExited(message) {
 
 
 async function newLike(message) {
-  const { id, userId, postId } = message;
-  const [post, like, user] = await Promise.all([rdsPosts.getPost(postId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
+  const { id, userId, parentId } = message;
+  const [resource, ...entityIdx] = parentId.split('_');
+  const entityId = entityIdx.join('_');
+
+  const [post, like, user] = await Promise.all([rdsPosts.getPost(entityId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
   const { marriageId } = post;
   if (marriageId) {
     const muObj = await rdsMUsers.getUser(marriageId, userId);
@@ -180,7 +183,6 @@ async function newLike(message) {
 
   await rdsLikes.recountLikes(like.parentId);
 
-  const [resource] = like.parentId.split('_');
   switch (resource) {
     case 'post':
       await snsHelper.pushToSNS('fcm', { service: 'notification',
@@ -192,7 +194,7 @@ async function newLike(message) {
           title: `${user.username ?? user.name} liked your post.`,
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: '/post-screen', args: { postId, useCache: false } },
+          payload: { screen: '/post-screen', args: { postId: entityId, useCache: false } },
         } });
       break;
     default:
@@ -228,8 +230,10 @@ async function deleteLike(message) {
 
 
 async function newComment(message) {
-  const { id, userId, postId } = message;
-  const [post, user, comment] = await Promise.all([rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
+  const { id, userId, parentId } = message;
+  const [resource, ...entityIdx] = parentId.split('_');
+  const entityId = entityIdx.join('_');
+  const [post, user, comment] = await Promise.all([rdsPosts.getPost(entityId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
   const { marriageId } = post;
   if (marriageId) {
     const muObj = await rdsMUsers.getUser(marriageId, userId);
@@ -244,8 +248,6 @@ async function newComment(message) {
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
   await rdsComments.recountComments(comment.parentId);
-
-  const [resource] = comment.parentId.split('_');
   switch (resource) {
     case 'post':
       await snsHelper.pushToSNS('fcm', { service: 'notification',
@@ -257,7 +259,7 @@ async function newComment(message) {
           title: `${user.username ?? user.name} commented on your post.`,
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: '/post-screen', args: { postId, useCache: false } },
+          payload: { screen: '/post-screen', args: { postId: entityId, useCache: false } },
         } });
       break;
     default:
