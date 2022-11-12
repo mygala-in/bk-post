@@ -257,7 +257,7 @@ async function getPost(request) {
 async function likeAction(request) {
   const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { insertId } = await rdsLikes.saveLike({ parentId, creatorId: decoded.id, isDeleted: false });
+  const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'add', data: resp });
@@ -285,8 +285,7 @@ async function unlikeAction(request) {
 async function newComment(request) {
   const { decoded, body } = request;
   const parentId = request.pathParameters.id;
-  const { postId, type, text } = body;
-  const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
+  const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, text: body.text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'add', data: resp });
