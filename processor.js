@@ -194,7 +194,7 @@ async function newLike(message) {
           title: `${user.username ?? user.name} liked your post.`,
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: '/post-screen', args: { postId: entityId, useCache: false } },
+          payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
         } });
       break;
     default:
@@ -259,7 +259,7 @@ async function newComment(message) {
           title: `${user.username ?? user.name} commented on your post.`,
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: '/post-screen', args: { postId: entityId, useCache: false } },
+          payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
         } });
       break;
     default:
