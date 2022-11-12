@@ -64,13 +64,18 @@ async function getRecentLikes(parentIds, userId) {
 }
 
 
-async function getRecentComments(ids, type) {
+
+/*
+  this module is responsible for
+  1. get the recent comments for the parentIds [only from cache]
+*/
+async function getRecentComments(parentIds) {
   const resp = { type: 'collection', count: 0, items: [] };
   try {
-    if (ids.length === 0) return resp;
+    if (parentIds.length === 0) return resp;
     const tasks = [];
-    for (let i = 0; i < ids.length; i += 1) {
-      tasks.push(redis.lrange(`${type}_${ids[i]}_recent_comments`, 'int'));
+    for (let i = 0; i < parentIds.length; i += 1) {
+      tasks.push(redis.lrange(`${parentIds[i]}_recent_comments`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const commentIds = _.flatten(cache);
@@ -153,7 +158,7 @@ async function getTimeline(request) {
   const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsAssets.getParentAssetsIn(ids.map((id) => `post_${id}`)),
     rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids.map((i) => `post_${i}`), decoded.id),
-    getRecentComments(ids, 'post'),
+    getRecentComments(ids.map((i) => `post_${i}`)),
   ]);
   logger.info('total assets ', assets.count);
   const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
@@ -237,7 +242,7 @@ async function getPost(request) {
   tasks.push(rdsLikes.likesCountsIn([id], 'post'));
   tasks.push(rdsComments.commentsCountsIn([id], 'post'));
   tasks.push(getRecentLikes([`post_${id}`], decoded.id));
-  tasks.push(getRecentComments([id], 'post'));
+  tasks.push(getRecentComments([`post_${id}`]));
   if (marriageId) tasks.push(rdsMarriages.getMarriage(marriageId));
   const [user, assets, totalLikes, totalComments, recentLikes, recentComments, marriage] = await Promise.all(tasks);
   resp.user = user;
@@ -338,7 +343,7 @@ async function getComments(request) {
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
     rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds.map((c) => `comment_${c}`), decoded.id),
-    getRecentComments(commentIds, 'comment'),
+    getRecentComments(commentIds.map((c) => `comment_${c}`)),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
     const comment = resp.items[i];
