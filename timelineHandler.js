@@ -173,9 +173,9 @@ async function getTimeline(request) {
     const post = resp.items[i];
     if (post.userId) [post.user] = users.items.filter((u) => u.id === post.userId);
     if (post.marriageId) [post.marriage] = marriages.items.filter((u) => u.id === post.marriageId);
-    const pLikes = recentLikes.items.filter((k) => k.parentId === post.id);
+    const pLikes = recentLikes.items.filter((k) => k.parentId === `post_${post.id}`);
     post.likes = { type: 'collection', total: totalLikes[i] || 0, items: pLikes, count: pLikes.length };
-    const pComments = recentComments.items.filter((k) => k.parentId === post.id);
+    const pComments = recentComments.items.filter((k) => k.parentId === `post_${post.id}`);
     post.comments = { type: 'collection', total: totalComments[i] || 0, items: pComments, count: pComments.length };
     const pAssets = assets.items.filter((k) => k.parentId === `post_${post.id}`);
     post.assets = { type: 'collection', total: pAssets.length, items: pAssets, count: pAssets.length };
