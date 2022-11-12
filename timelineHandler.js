@@ -360,10 +360,10 @@ async function getComments(request) {
 async function getLikes(request) {
   // const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { type, page, size } = request.queryStringParameters;
+  const { page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const [resp, total] = await Promise.all([rdsLikes.getLikes(parentId, type, page, size), rdsLikes.likesCountsIn([parentId], type)]);
+  const [resp, total] = await Promise.all([rdsLikes.getLikes(parentId, page, size), rdsLikes.likesCountsIn([parentId])]);
   [resp.total] = total;
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));

@@ -190,7 +190,7 @@ async function newLike(message) {
   like.user = user;
   await redis.set(`like_${id}`, JSON.stringify(like), REDIS_CONFIG.timeline.likes);
 
-  await rdsLikes.recountLikes(like.parentId, like.type);
+  await rdsLikes.recountLikes(like.parentId);
 
   switch (like.type) {
     case 'post':
@@ -231,7 +231,7 @@ async function newLike(message) {
 async function deleteLike(message) {
   const { id } = message;
   const like = await rdsLikes.getLike(id);
-  await Promise.all([rdsLikes.recountLikes(like.parentId, like.type), redis.del(`like_${id}`)]);
+  await Promise.all([rdsLikes.recountLikes(like.parentId), redis.del(`like_${id}`)]);
   const key = getRecentLikesKey(like);
   if (key) await redis.lrem(key, id);
   logger.info('completed unlike actions');
