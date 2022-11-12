@@ -155,10 +155,12 @@ async function getTimeline(request) {
   logger.info('paginated timeline items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
-  const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsAssets.getParentAssetsIn(ids.map((id) => `post_${id}`)),
-    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids.map((i) => `post_${i}`), decoded.id),
-    getRecentComments(ids.map((i) => `post_${i}`)),
+  const parentIds = ids.map((i) => `post_${i}`);
+
+  const [resp, assets, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+    rdsPosts.getPostsIn(ids), rdsAssets.getParentAssetsIn(parentIds),
+    rdsLikes.likesCountsIn(parentIds), rdsComments.commentsCountsIn(parentIds),
+    getRecentLikes(parentIds, decoded.id), getRecentComments(parentIds),
   ]);
   logger.info('total assets ', assets.count);
   const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
