@@ -254,7 +254,7 @@ async function newComment(message) {
   comment.user = user;
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
-  await rdsComments.recountComments(comment.parentId, comment.type);
+  await rdsComments.recountComments(comment.parentId);
 
   switch (comment.type) {
     case 'post':
@@ -319,7 +319,7 @@ async function editComment(message) {
 async function deleteComment(message) {
   const { id } = message;
   const comment = await rdsComments.getComment(id);
-  await Promise.all([rdsComments.recountComments(comment.parentId, comment.type), redis.del(`comment_${id}`)]);
+  await Promise.all([rdsComments.recountComments(comment.parentId), redis.del(`comment_${id}`)]);
   const key = getRecentCommentsKey(comment);
   if (key) await redis.lrem(key, id);
   logger.info('completed uncomment actions');
