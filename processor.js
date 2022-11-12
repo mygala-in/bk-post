@@ -10,7 +10,9 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
+const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
+const rdsMEvents = require('./bk-utils/rds/rds.marriage.events.helper');
 
 const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, MARRIAGE_CONFIG } = constants;
 
@@ -21,6 +23,28 @@ function getRecentLikesKey(like) {
 
 function getRecentCommentsKey(comment) {
   return `${comment.parentId}_recent_comments`;
+}
+
+
+async function getRootParent(parentId) {
+  const [resource, ...entityIdx] = parentId.split('_');
+  const entityId = entityIdx.join('_');
+
+  let parent;
+  switch (resource) {
+    case 'post':
+      return rdsPosts.getPost(entityId);
+    case 'marriage':
+      return rdsMarriages.getMarriage(entityId);
+    case 'event':
+      return rdsMEvents.getEventById(entityId);
+    case 'comment':
+      parent = await rdsComments.getComment(entityId);
+      logger.info('sub parent ', parent);
+      return getRootParent(parent.parentId);
+    default:
+      return null;
+  }
 }
 
 
@@ -167,20 +191,33 @@ async function newLike(message) {
   const [resource, ...entityIdx] = parentId.split('_');
   const entityId = entityIdx.join('_');
 
-  const [post, like, user] = await Promise.all([rdsPosts.getPost(entityId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
-  const { marriageId } = post;
-  if (marriageId) {
-    const muObj = await rdsMUsers.getUser(marriageId, userId);
-    logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(post)) {
-      logger.warn('unauthorized like action');
-      await rdsLikes.deleteLike(id);
-      return;
+  const [parent, like, user] = await Promise.all([getRootParent(parentId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
+  logger.info('root parent ', JSON.stringify(parent));
+
+  let topic = '';
+  if (parent && parent.entity) {
+    let muObj;
+    switch (parent.entity) {
+      case 'post':
+        muObj = await rdsMUsers.getUser(parent.marriageId, userId);
+        logger.info('requested user ', muObj);
+        if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(parent)) {
+          logger.warn('unauthorized like action');
+          await rdsLikes.deleteLike(id);
+          return;
+        }
+        topic = common.getTopicName('user', parent.userId);
+        break;
+
+      default:
+        logger.warn('unhandled parent liked');
+        await rdsLikes.deleteLike(id);
+        return;
     }
   }
+
   like.user = user;
   await redis.set(`like_${id}`, JSON.stringify(like), REDIS_CONFIG.timeline.likes);
-
   await rdsLikes.recountLikes(like.parentId);
 
   switch (resource) {
@@ -192,7 +229,21 @@ async function newLike(message) {
           id: `${like.id}`,
           type: 'default',
           title: `${user.username ?? user.name} liked your post.`,
-          topic: common.getTopicName('user', post.userId),
+          topic,
+          groupId: APP_NOTIFICATIONS.channels.post,
+          payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
+        } });
+      break;
+
+    case 'comment':
+      await snsHelper.pushToSNS('fcm', { service: 'notification',
+        component: 'notification',
+        action: 'new',
+        data: {
+          id: `${like.id}`,
+          type: 'default',
+          title: `${user.username ?? user.name} liked your comment.`,
+          topic,
           groupId: APP_NOTIFICATIONS.channels.post,
           payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
         } });
