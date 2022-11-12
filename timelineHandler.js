@@ -16,13 +16,19 @@ const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
 
 const { MARRIAGE_CONFIG, MINI_PROFILE_FIELDS } = constants;
 
-async function getRecentLikes(ids, type, userId) {
+
+/*
+  this module is responsible for doing 2 things.
+  1. get the recent likes for the parentIds [only from cache]
+  2. whether the person requesting recent likes has himself liked each of the parentIds or not. [hence userId argument is used]
+*/
+async function getRecentLikes(parentIds, userId) {
   const resp = { type: 'collection', count: 0, items: [] };
   try {
-    if (ids.length === 0) return resp;
+    if (parentIds.length === 0) return resp;
     const tasks = [];
-    for (let i = 0; i < ids.length; i += 1) {
-      tasks.push(redis.lrange(`${type}_${ids[i]}_recent_likes`, 'int'));
+    for (let i = 0; i < parentIds.length; i += 1) {
+      tasks.push(redis.lrange(`${parentIds[i]}_recent_likes`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const likeIds = _.flatten(cache);
@@ -34,14 +40,14 @@ async function getRecentLikes(ids, type, userId) {
     }
     logger.info('cached likes ', resp);
     const missed = [];
-    for (let i = 0; i < ids.length; i += 1) {
-      if (resp.items.filter((k) => k.parentId === ids[i] && k.userId === userId).length === 0) {
-        missed.push(ids[i]);
+    for (let i = 0; i < parentIds.length; i += 1) {
+      if (resp.items.filter((k) => k.parentId === parentIds[i] && k.userId === userId).length === 0) {
+        missed.push(parentIds[i]);
       }
     }
     logger.info('user missed likes', missed);
     if (missed.length > 0) {
-      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed, type)]);
+      const [user, likes] = await Promise.all([rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS), rdsLikes.searchLikes(userId, missed)]);
       for (let k = 0; k < likes.count; k += 1) {
         const like = likes.items[k];
         like.user = user;
@@ -58,13 +64,18 @@ async function getRecentLikes(ids, type, userId) {
 }
 
 
-async function getRecentComments(ids, type) {
+
+/*
+  this module is responsible for
+  1. get the recent comments for the parentIds [only from cache]
+*/
+async function getRecentComments(parentIds) {
   const resp = { type: 'collection', count: 0, items: [] };
   try {
-    if (ids.length === 0) return resp;
+    if (parentIds.length === 0) return resp;
     const tasks = [];
-    for (let i = 0; i < ids.length; i += 1) {
-      tasks.push(redis.lrange(`${type}_${ids[i]}_recent_comments`, 'int'));
+    for (let i = 0; i < parentIds.length; i += 1) {
+      tasks.push(redis.lrange(`${parentIds[i]}_recent_comments`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const commentIds = _.flatten(cache);
@@ -144,10 +155,12 @@ async function getTimeline(request) {
   logger.info('paginated timeline items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
-  const [assets, resp, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
-    rdsAssets.getParentAssetsIn(ids.map((id) => `post_${id}`)),
-    rdsPosts.getPostsIn(ids), rdsLikes.likesCountsIn(ids, 'post'), rdsComments.commentsCountsIn(ids, 'post'), getRecentLikes(ids, 'post', decoded.id),
-    getRecentComments(ids, 'post'),
+  const parentIds = ids.map((i) => `post_${i}`);
+
+  const [resp, assets, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
+    rdsPosts.getPostsIn(ids), rdsAssets.getParentAssetsIn(parentIds),
+    rdsLikes.likesCountsIn(parentIds), rdsComments.commentsCountsIn(parentIds),
+    getRecentLikes(parentIds, decoded.id), getRecentComments(parentIds),
   ]);
   logger.info('total assets ', assets.count);
   const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
@@ -160,9 +173,9 @@ async function getTimeline(request) {
     const post = resp.items[i];
     if (post.userId) [post.user] = users.items.filter((u) => u.id === post.userId);
     if (post.marriageId) [post.marriage] = marriages.items.filter((u) => u.id === post.marriageId);
-    const pLikes = recentLikes.items.filter((k) => k.parentId === post.id);
+    const pLikes = recentLikes.items.filter((k) => k.parentId === `post_${post.id}`);
     post.likes = { type: 'collection', total: totalLikes[i] || 0, items: pLikes, count: pLikes.length };
-    const pComments = recentComments.items.filter((k) => k.parentId === post.id);
+    const pComments = recentComments.items.filter((k) => k.parentId === `post_${post.id}`);
     post.comments = { type: 'collection', total: totalComments[i] || 0, items: pComments, count: pComments.length };
     const pAssets = assets.items.filter((k) => k.parentId === `post_${post.id}`);
     post.assets = { type: 'collection', total: pAssets.length, items: pAssets, count: pAssets.length };
@@ -230,8 +243,8 @@ async function getPost(request) {
   tasks.push(rdsAssets.getParentAssets(`post_${id}`));
   tasks.push(rdsLikes.likesCountsIn([id], 'post'));
   tasks.push(rdsComments.commentsCountsIn([id], 'post'));
-  tasks.push(getRecentLikes([id], 'post', decoded.id));
-  tasks.push(getRecentComments([id], 'post'));
+  tasks.push(getRecentLikes([`post_${id}`], decoded.id));
+  tasks.push(getRecentComments([`post_${id}`]));
   if (marriageId) tasks.push(rdsMarriages.getMarriage(marriageId));
   const [user, assets, totalLikes, totalComments, recentLikes, recentComments, marriage] = await Promise.all(tasks);
   resp.user = user;
@@ -244,10 +257,9 @@ async function getPost(request) {
 
 
 async function likeAction(request) {
-  const { decoded, body } = request;
+  const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { postId, type } = body;
-  const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, postId, type, isDeleted: false });
+  const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'add', data: resp });
@@ -275,8 +287,7 @@ async function unlikeAction(request) {
 async function newComment(request) {
   const { decoded, body } = request;
   const parentId = request.pathParameters.id;
-  const { postId, type, text } = body;
-  const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, postId, type, text, isDeleted: false });
+  const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, text: body.text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
   await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'add', data: resp });
@@ -321,10 +332,10 @@ async function editComment(request) {
 async function getComments(request) {
   const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { type, page, size } = request.queryStringParameters;
+  const { page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const [resp, total] = await Promise.all([rdsComments.getComments(parentId, type, page, size), rdsComments.commentsCountsIn([parentId], type)]);
+  const [resp, total] = await Promise.all([rdsComments.getComments(parentId, page, size), rdsComments.commentsCountsIn([parentId])]);
   [resp.total] = total;
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
@@ -332,15 +343,15 @@ async function getComments(request) {
   const commentIds = resp.items.map((r) => r.id);
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
-    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds, 'comment', decoded.id),
-    getRecentComments(commentIds, 'comment'),
+    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds.map((c) => `comment_${c}`), decoded.id),
+    getRecentComments(commentIds.map((c) => `comment_${c}`)),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
     const comment = resp.items[i];
     if (comment.userId) [comment.user] = users.items.filter((u) => u.id === comment.userId);
-    const likes = recentLikes.items.filter((k) => k.parentId === comment.id);
+    const likes = recentLikes.items.filter((k) => k.parentId === `comment_${comment.id}`);
     comment.likes = { type: 'collection', total: totalLikes[i] || 0, items: likes, count: likes.length };
-    const comments = recentComments.items.filter((k) => k.parentId === comment.id);
+    const comments = recentComments.items.filter((k) => k.parentId === `comment_${comment.id}`);
     comment.replies = { type: 'collection', total: totalComments[i] || 0, items: comments, count: comments.length };
     resp.items[i] = comment;
   }
@@ -351,10 +362,10 @@ async function getComments(request) {
 async function getLikes(request) {
   // const { decoded } = request;
   const parentId = request.pathParameters.id;
-  const { type, page, size } = request.queryStringParameters;
+  const { page, size } = request.queryStringParameters;
 
   // TODO - check user is authorized to access requested parent
-  const [resp, total] = await Promise.all([rdsLikes.getLikes(parentId, type, page, size), rdsLikes.likesCountsIn([parentId], type)]);
+  const [resp, total] = await Promise.all([rdsLikes.getLikes(parentId, page, size), rdsLikes.likesCountsIn([parentId])]);
   [resp.total] = total;
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));

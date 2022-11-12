@@ -10,28 +10,40 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
+const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
 const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
+const rdsMEvents = require('./bk-utils/rds/rds.marriage.events.helper');
 
 const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, MARRIAGE_CONFIG } = constants;
 
 
 function getRecentLikesKey(like) {
-  const postfix = 'recent_likes';
-  const { parentId, postId, type } = like;
-  switch (type) {
-    case 'post': return `post_${postId}_${postfix}`;
-    case 'comment': return `comment_${parentId}_${postfix}`;
-    default: return null;
-  }
+  return `${like.parentId}_recent_likes`;
 }
 
 function getRecentCommentsKey(comment) {
-  const postfix = 'recent_comments';
-  const { parentId, postId, type } = comment;
-  switch (type) {
-    case 'post': return `post_${postId}_${postfix}`;
-    case 'comment': return `comment_${parentId}_${postfix}`;
-    default: return null;
+  return `${comment.parentId}_recent_comments`;
+}
+
+
+async function getRootParent(parentId) {
+  const [resource, ...entityIdx] = parentId.split('_');
+  const entityId = entityIdx.join('_');
+
+  let parent;
+  switch (resource) {
+    case 'post':
+      return rdsPosts.getPost(entityId);
+    case 'marriage':
+      return rdsMarriages.getMarriage(entityId);
+    case 'event':
+      return rdsMEvents.getEventById(entityId);
+    case 'comment':
+      parent = await rdsComments.getComment(entityId);
+      logger.info('sub parent ', parent);
+      return getRootParent(parent.parentId);
+    default:
+      return null;
   }
 }
 
@@ -175,24 +187,40 @@ async function userExited(message) {
 
 
 async function newLike(message) {
-  const { id, userId, postId } = message;
-  const [post, like, user] = await Promise.all([rdsPosts.getPost(postId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
-  const { marriageId } = post;
-  if (marriageId) {
-    const muObj = await rdsMUsers.getUser(marriageId, userId);
-    logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(post)) {
-      logger.warn('unauthorized like action');
-      await rdsLikes.deleteLike(id);
-      return;
+  const { id, userId, parentId } = message;
+  const [resource, ...entityIdx] = parentId.split('_');
+  const entityId = entityIdx.join('_');
+
+  const [parent, like, user] = await Promise.all([getRootParent(parentId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
+  logger.info('root parent ', JSON.stringify(parent));
+
+  let topic = '';
+  if (parent && parent.entity) {
+    let muObj;
+    switch (parent.entity) {
+      case 'post':
+        muObj = await rdsMUsers.getUser(parent.marriageId, userId);
+        logger.info('requested user ', muObj);
+        if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(parent)) {
+          logger.warn('unauthorized like action');
+          await rdsLikes.deleteLike(id);
+          return;
+        }
+        topic = common.getTopicName('user', parent.userId);
+        break;
+
+      default:
+        logger.warn('unhandled parent liked');
+        await rdsLikes.deleteLike(id);
+        return;
     }
   }
+
   like.user = user;
   await redis.set(`like_${id}`, JSON.stringify(like), REDIS_CONFIG.timeline.likes);
+  await rdsLikes.recountLikes(like.parentId);
 
-  await rdsLikes.recountLikes(like.parentId, like.type);
-
-  switch (like.type) {
+  switch (resource) {
     case 'post':
       await snsHelper.pushToSNS('fcm', { service: 'notification',
         component: 'notification',
@@ -201,9 +229,23 @@ async function newLike(message) {
           id: `${like.id}`,
           type: 'default',
           title: `${user.username ?? user.name} liked your post.`,
-          topic: common.getTopicName('user', post.userId),
+          topic,
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: '/post-screen', args: { postId, useCache: false } },
+          payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
+        } });
+      break;
+
+    case 'comment':
+      await snsHelper.pushToSNS('fcm', { service: 'notification',
+        component: 'notification',
+        action: 'new',
+        data: {
+          id: `${like.id}`,
+          type: 'default',
+          title: `${user.username ?? user.name} liked your comment.`,
+          topic,
+          groupId: APP_NOTIFICATIONS.channels.post,
+          payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
         } });
       break;
     default:
@@ -231,7 +273,7 @@ async function newLike(message) {
 async function deleteLike(message) {
   const { id } = message;
   const like = await rdsLikes.getLike(id);
-  await Promise.all([rdsLikes.recountLikes(like.parentId, like.type), redis.del(`like_${id}`)]);
+  await Promise.all([rdsLikes.recountLikes(like.parentId), redis.del(`like_${id}`)]);
   const key = getRecentLikesKey(like);
   if (key) await redis.lrem(key, id);
   logger.info('completed unlike actions');
@@ -239,8 +281,10 @@ async function deleteLike(message) {
 
 
 async function newComment(message) {
-  const { id, userId, postId } = message;
-  const [post, user, comment] = await Promise.all([rdsPosts.getPost(postId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
+  const { id, userId, parentId } = message;
+  const [resource, ...entityIdx] = parentId.split('_');
+  const entityId = entityIdx.join('_');
+  const [post, user, comment] = await Promise.all([rdsPosts.getPost(entityId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
   const { marriageId } = post;
   if (marriageId) {
     const muObj = await rdsMUsers.getUser(marriageId, userId);
@@ -254,9 +298,8 @@ async function newComment(message) {
   comment.user = user;
   await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
-  await rdsComments.recountComments(comment.parentId, comment.type);
-
-  switch (comment.type) {
+  await rdsComments.recountComments(comment.parentId);
+  switch (resource) {
     case 'post':
       await snsHelper.pushToSNS('fcm', { service: 'notification',
         component: 'notification',
@@ -267,7 +310,7 @@ async function newComment(message) {
           title: `${user.username ?? user.name} commented on your post.`,
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: '/post-screen', args: { postId, useCache: false } },
+          payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
         } });
       break;
     default:
@@ -319,7 +362,7 @@ async function editComment(message) {
 async function deleteComment(message) {
   const { id } = message;
   const comment = await rdsComments.getComment(id);
-  await Promise.all([rdsComments.recountComments(comment.parentId, comment.type), redis.del(`comment_${id}`)]);
+  await Promise.all([rdsComments.recountComments(comment.parentId), redis.del(`comment_${id}`)]);
   const key = getRecentCommentsKey(comment);
   if (key) await redis.lrem(key, id);
   logger.info('completed uncomment actions');
