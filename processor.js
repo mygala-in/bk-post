@@ -180,7 +180,8 @@ async function newLike(message) {
 
   await rdsLikes.recountLikes(like.parentId);
 
-  switch (like.type) {
+  const [resource] = like.parentId.split('_');
+  switch (resource) {
     case 'post':
       await snsHelper.pushToSNS('fcm', { service: 'notification',
         component: 'notification',
@@ -244,7 +245,8 @@ async function newComment(message) {
 
   await rdsComments.recountComments(comment.parentId);
 
-  switch (comment.type) {
+  const [resource] = comment.parentId.split('_');
+  switch (resource) {
     case 'post':
       await snsHelper.pushToSNS('fcm', { service: 'notification',
         component: 'notification',
