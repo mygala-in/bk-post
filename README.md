@@ -1,2 +1,2 @@
 # bk-timeline
-manage timeline for mygala users, marriages, etc.
+manage timeline for wedstage users, marriages, etc.

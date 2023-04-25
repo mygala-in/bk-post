@@ -1,5 +1,5 @@
-service: mygala-bk-timeline
-frameworkVersion: '3.12.0'
+service: wedstage-bk-timeline
+frameworkVersion: '3.30.1'
 configValidationMode: error
 
 plugins:
@@ -15,8 +15,8 @@ custom:
     noPrependStageInUrl: true
   config: ${file(./bk-config/config.${self:provider.stage}.json)}
   domains:
-    prod: api.mygala.in
-    dev: dev-api.mygala.in
+    prod: api.wedstage.com
+    dev: dev-api.wedstage.com
   customDomain:
     # Ex: serverless create_domain --stage dev
     domainName: ${self:custom.domains.${self:provider.stage}}
@@ -52,7 +52,7 @@ provider:
       - ${self:custom.config.subnet2}
       - ${self:custom.config.subnet3}
   endpointType: REGIONAL
-  deploymentBucket: ${self:provider.stage}-mygala-sls-deployments
+  deploymentBucket: ${self:provider.stage}-wedstage-serverless-deployments
   environment:
     stage: ${self:provider.stage}
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
