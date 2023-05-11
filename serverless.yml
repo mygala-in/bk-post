@@ -62,6 +62,7 @@ provider:
     jwtSecretKey: ${self:custom.config.jwtSecretKey}
     redisHost: ${self:custom.config.redisHost}
     redisPort: ${self:custom.config.redisPort}
+    redisRetries: ${self:custom.config.redisRetries}
     redisPassword: ${self:custom.config.redisPassword}
     rdsArn: ${self:custom.config.rdsArn}
     rdsDatabase: ${self:custom.config.rdsDatabase}
