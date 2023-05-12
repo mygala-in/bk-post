@@ -13,7 +13,7 @@ custom:
     number: 2
   serverless-offline:
     noPrependStageInUrl: true
-  config: ${file(./bk-config/config.${self:provider.stage}.json)}
+  config: ${file(./bk-config/configs.${self:provider.stage}.json)}
   domains:
     prod: api.wedstage.com
     dev: dev-api.wedstage.com
@@ -53,20 +53,8 @@ provider:
   #     - ${self:custom.config.subnet3}
   endpointType: REGIONAL
   deploymentBucket: ${self:provider.stage}-wedstage-serverless-deployments
-  environment:
-    stage: ${self:provider.stage}
-    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
-    awsRegion: ${self:custom.config.awsRegion}
-    envPrefix: ${self:custom.config.envPrefix}
-    awsAccountId: ${self:custom.config.awsAccountId}
-    jwtSecretKey: ${self:custom.config.jwtSecretKey}
-    redisHost: ${self:custom.config.redisHost}
-    redisPort: ${self:custom.config.redisPort}
-    redisRetries: ${self:custom.config.redisRetries}
-    redisPassword: ${self:custom.config.redisPassword}
-    rdsArn: ${self:custom.config.rdsArn}
-    rdsDatabase: ${self:custom.config.rdsDatabase}
-    rdsSecretArn: ${self:custom.config.rdsSecretArn}
+  environment: ${file(./bk-config/envs.${self:provider.stage}.json)}
+
 
 functions:
   timeline-bg-tasks:
