@@ -1,5 +1,5 @@
-service: mygala-bk-timeline
-frameworkVersion: '3.12.0'
+service: wedstage-bk-timeline
+frameworkVersion: '3.30.1'
 configValidationMode: error
 
 plugins:
@@ -13,10 +13,10 @@ custom:
     number: 2
   serverless-offline:
     noPrependStageInUrl: true
-  config: ${file(./bk-config/config.${self:provider.stage}.json)}
+  config: ${file(./bk-config/configs.${self:provider.stage}.json)}
   domains:
-    prod: api.mygala.in
-    dev: dev-api.mygala.in
+    prod: api.wedstage.com
+    dev: dev-api.wedstage.com
   customDomain:
     # Ex: serverless create_domain --stage dev
     domainName: ${self:custom.domains.${self:provider.stage}}
@@ -44,28 +44,17 @@ provider:
   stage: ${opt:stage, 'dev'}
   iam:
     role: ${self:custom.config.lambdaRole}
-  vpc:
-    securityGroupIds:
-      - ${self:custom.config.securityGroup}
-    subnetIds:
-      - ${self:custom.config.subnet1}
-      - ${self:custom.config.subnet2}
-      - ${self:custom.config.subnet3}
+  # vpc:
+  #   securityGroupIds:
+  #     - ${self:custom.config.securityGroup}
+  #   subnetIds:
+  #     - ${self:custom.config.subnet1}
+  #     - ${self:custom.config.subnet2}
+  #     - ${self:custom.config.subnet3}
   endpointType: REGIONAL
-  deploymentBucket: ${self:provider.stage}-mygala-sls-deployments
-  environment:
-    stage: ${self:provider.stage}
-    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
-    awsRegion: ${self:custom.config.awsRegion}
-    envPrefix: ${self:custom.config.envPrefix}
-    awsAccountId: ${self:custom.config.awsAccountId}
-    jwtSecretKey: ${self:custom.config.jwtSecretKey}
-    redisHost: ${self:custom.config.redisHost}
-    redisPort: ${self:custom.config.redisPort}
-    redisPassword: ${self:custom.config.redisPassword}
-    rdsArn: ${self:custom.config.rdsArn}
-    rdsDatabase: ${self:custom.config.rdsDatabase}
-    rdsSecretArn: ${self:custom.config.rdsSecretArn}
+  deploymentBucket: ${self:provider.stage}-wedstage-serverless-deployments
+  environment: ${file(./bk-config/envs.${self:provider.stage}.json)}
+
 
 functions:
   timeline-bg-tasks:
