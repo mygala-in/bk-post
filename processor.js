@@ -10,11 +10,11 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
-const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
-const rdsMEvents = require('./bk-utils/rds/rds.marriage.events.helper');
+const rdsWeddings = require('./bk-utils/rds/rds.weddings.helper');
+const rdsWUsers = require('./bk-utils/rds/rds.wedding.users.helper');
+const rdsWEvents = require('./bk-utils/rds/rds.wedding.events.helper');
 
-const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, MARRIAGE_CONFIG } = constants;
+const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, WEDDING_CONFIG } = constants;
 
 
 function getRecentLikesKey(like) {
@@ -34,10 +34,10 @@ async function getRootParent(parentId) {
   switch (resource) {
     case 'post':
       return rdsPosts.getPost(entityId);
-    case 'marriage':
-      return rdsMarriages.getMarriage(entityId);
+    case 'wedding':
+      return rdsWeddings.getWedding(entityId);
     case 'event':
-      return rdsMEvents.getEventById(entityId);
+      return rdsWEvents.getEventById(entityId);
     case 'comment':
       parent = await rdsComments.getComment(entityId);
       logger.info('sub parent ', parent);
@@ -49,11 +49,11 @@ async function getRootParent(parentId) {
 
 
 async function newPost(message) {
-  const { postId, marriageId, userId } = message;
+  const { postId, weddingId, userId } = message;
   logger.info('adding post to user timelines ', postId, JSON.stringify(message));
-  const [mUsers, user, post] = await Promise.all([rdsMUsers.getUsers(marriageId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(postId)]);
+  const [mUsers, user, post] = await Promise.all([rdsWUsers.getUsers(weddingId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(postId)]);
   const ids = mUsers.items.map((u) => u.userId);
-  logger.info('total marriage users ', ids.length);
+  logger.info('total wedding users ', ids.length);
   for (let i = 0; i < ids.length; i += 1) {
     const key = `user_${ids[i]}_timeline`;
     const exists = await redis.exists(key);
@@ -65,11 +65,11 @@ async function newPost(message) {
   let title = '';
   logger.info(`post type :: ${post.type}`);
   switch (post.type) {
-    case 'marriage.post':
+    case 'wedding.post':
       title = `${user.username ?? user.name} added a new post.`;
       break;
-    case 'marriage.join':
-      title = `${user.username ?? user.name} joined the marriage.`;
+    case 'wedding.join':
+      title = `${user.username ?? user.name} joined the wedding.`;
       break;
     default:
   }
@@ -80,7 +80,7 @@ async function newPost(message) {
     data: { id: `${postId}`,
       type: 'default',
       title,
-      topic: common.getTopicName('marriage', marriageId),
+      topic: common.getTopicName('wedding', weddingId),
       groupId: APP_NOTIFICATIONS.channels.profile,
       payload: { screen: '/post-screen', args: { postId, useCache: false } },
     } });
@@ -89,16 +89,16 @@ async function newPost(message) {
 
 
 async function deletePost(message) {
-  const { postId, marriageId } = message;
+  const { postId, weddingId } = message;
   let { userIds } = message;
   logger.info('removing post from user timelines ', postId, JSON.stringify(message));
 
   if (userIds) {
     logger.info('using users from request ', userIds.length);
   } else {
-    const mUsers = await rdsMUsers.getUsers(marriageId);
+    const mUsers = await rdsWUsers.getUsers(weddingId);
     userIds = mUsers.items.map((user) => user.userId);
-    logger.info('total marriage users ', userIds.length);
+    logger.info('total wedding users ', userIds.length);
   }
 
   for (let i = 0; i < userIds.length; i += 1) {
@@ -114,11 +114,11 @@ async function deletePost(message) {
 
 async function generateTimeline(userId) {
   logger.info('started generating timeline for user ', userId);
-  const mJoins = await rdsMUsers.getMarriages(userId);
-  const vIds = mJoins.items.filter((i) => i.status === MARRIAGE_CONFIG.status.verified).map((i) => i.marriageId);
-  logger.info('verified marriage ids ', vIds);
+  const mJoins = await rdsWUsers.getWeddings(userId);
+  const vIds = mJoins.items.filter((i) => i.status === WEDDING_CONFIG.status.verified).map((i) => i.weddingId);
+  logger.info('verified wedding ids ', vIds);
 
-  const postIds = await rdsPosts.getMarriagePostIds(vIds);
+  const postIds = await rdsPosts.getWeddingPostIds(vIds);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   for (let i = 0; i < postIds.count; i += 1) {
@@ -132,15 +132,15 @@ async function generateTimeline(userId) {
 
 
 async function userJoined(message) {
-  const { userId, marriageId } = message;
-  logger.info('started adding marriage posts to user timeline ', { marriageId, userId });
+  const { userId, weddingId } = message;
+  logger.info('started adding wedding posts to user timeline ', { weddingId, userId });
   const key = `user_${userId}_timeline`;
   const exists = await redis.exists(key);
   if (!exists) {
     logger.info('user timeline does not exist, skipping action');
     return;
   }
-  const postIds = await rdsPosts.getMarriagePostIds([marriageId]);
+  const postIds = await rdsPosts.getWeddingPostIds([weddingId]);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   for (let i = 0; i < postIds.count; i += 1) {
@@ -149,31 +149,31 @@ async function userJoined(message) {
   }
   await Promise.all(tasks);
   await redis.expire(key, REDIS_CONFIG.timeline.user);
-  logger.info('completed adding marriage posts to user timeline');
+  logger.info('completed adding wedding posts to user timeline');
 }
 
 
 async function userExited(message) {
-  const { userId, marriageId } = message;
-  logger.info('started removing marriage posts from user timeline ', { marriageId, userId });
+  const { userId, weddingId } = message;
+  logger.info('started removing wedding posts from user timeline ', { weddingId, userId });
   let key = `user_${userId}_timeline`;
   let exists = await redis.exists(key);
   if (!exists) logger.info('user timeline does not exist, skipping action');
   else {
-    const postIds = await rdsPosts.getMarriagePostIds([marriageId]);
-    logger.info('total marriage posts ', postIds.count);
+    const postIds = await rdsPosts.getWeddingPostIds([weddingId]);
+    logger.info('total wedding posts ', postIds.count);
     await redis.zrem(key, postIds.items);
-    logger.info('completed removing marriage posts from user timeline');
+    logger.info('completed removing wedding posts from user timeline');
   }
 
-  logger.info('started removing user posts from all marriage users');
-  const postIds = await rdsPosts.getMarriageUserPostIds(marriageId, userId);
+  logger.info('started removing user posts from all wedding users');
+  const postIds = await rdsPosts.getWeddingUserPostIds(weddingId, userId);
   logger.info('total user posts ', postIds.count);
   await rdsPosts.deletePosts(postIds.items);
 
-  const mUsers = await rdsMUsers.getUsers(marriageId);
+  const mUsers = await rdsWUsers.getUsers(weddingId);
   const userIds = mUsers.items.map((user) => user.userId);
-  logger.info('total marriage users ', userIds.length);
+  logger.info('total wedding users ', userIds.length);
 
   for (let k = 0; k < userIds.length; k += 1) {
     key = `user_${userIds[k]}_timeline`;
@@ -182,7 +182,7 @@ async function userExited(message) {
       await redis.zrem(key, postIds.items);
     } else logger.info('skipping timeline update for ', key);
   }
-  logger.info('completed removing user posts from all marriage users');
+  logger.info('completed removing user posts from all wedding users');
 }
 
 
@@ -199,9 +199,9 @@ async function newLike(message) {
     let muObj;
     switch (parent.entity) {
       case 'post':
-        muObj = await rdsMUsers.getUser(parent.marriageId, userId);
+        muObj = await rdsWUsers.getUser(parent.weddingId, userId);
         logger.info('requested user ', muObj);
-        if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(parent)) {
+        if (_.isEmpty(muObj) || muObj.status !== WEDDING_CONFIG.status.verified || _.isEmpty(parent)) {
           logger.warn('unauthorized like action');
           await rdsLikes.deleteLike(id);
           return;
@@ -285,11 +285,11 @@ async function newComment(message) {
   const [resource, ...entityIdx] = parentId.split('_');
   const entityId = entityIdx.join('_');
   const [post, user, comment] = await Promise.all([rdsPosts.getPost(entityId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
-  const { marriageId } = post;
-  if (marriageId) {
-    const muObj = await rdsMUsers.getUser(marriageId, userId);
+  const { weddingId } = post;
+  if (weddingId) {
+    const muObj = await rdsWUsers.getUser(weddingId, userId);
     logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj) || muObj.status !== MARRIAGE_CONFIG.status.verified || _.isEmpty(post)) {
+    if (_.isEmpty(muObj) || muObj.status !== WEDDING_CONFIG.status.verified || _.isEmpty(post)) {
       logger.warn('unauthorized comment action');
       await rdsComments.deleteComment(id);
       return;
@@ -403,7 +403,7 @@ async function sns(request) {
         }
         break;
 
-      case 'marriage':
+      case 'wedding':
         switch (action) {
           case 'join': return userJoined(data);
           case 'exit': return userExited(data);

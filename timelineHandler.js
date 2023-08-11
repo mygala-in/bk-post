@@ -11,10 +11,10 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsMarriages = require('./bk-utils/rds/rds.marriages.helper');
-const rdsMUsers = require('./bk-utils/rds/rds.marriage.users.helper');
+const rdsWeddings = require('./bk-utils/rds/rds.weddings.helper');
+const rdsMUsers = require('./bk-utils/rds/rds.wedding.users.helper');
 
-const { MARRIAGE_CONFIG, MINI_PROFILE_FIELDS } = constants;
+const { WEDDING_CONFIG, MINI_PROFILE_FIELDS } = constants;
 
 
 /*
@@ -163,16 +163,16 @@ async function getTimeline(request) {
     getRecentLikes(parentIds, decoded.id), getRecentComments(parentIds),
   ]);
   logger.info('total assets ', assets.count);
-  const mIds = _.uniq(_.filter(resp.items.map((r) => r.marriageId), (id) => _.isNumber(id)));
-  logger.info('marriage ids ', mIds);
+  const mIds = _.uniq(_.filter(resp.items.map((r) => r.weddingId), (id) => _.isNumber(id)));
+  logger.info('wedding ids ', mIds);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const [users, marriages] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS), rdsMarriages.getMarriagesIn(mIds)]);
+  const [users, weddings] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS), rdsWeddings.getWeddingsIn(mIds)]);
 
   for (let i = 0; i < resp.count; i += 1) {
     const post = resp.items[i];
     if (post.userId) [post.user] = users.items.filter((u) => u.id === post.userId);
-    if (post.marriageId) [post.marriage] = marriages.items.filter((u) => u.id === post.marriageId);
+    if (post.weddingId) [post.wedding] = weddings.items.filter((u) => u.id === post.weddingId);
     const pLikes = recentLikes.items.filter((k) => k.parentId === `post_${post.id}`);
     post.likes = { type: 'collection', total: totalLikes[i] || 0, items: pLikes, count: pLikes.length };
     const pComments = recentComments.items.filter((k) => k.parentId === `post_${post.id}`);
@@ -190,12 +190,12 @@ async function newPost(request) {
   const { decoded, body } = request;
   let muObj;
   switch (body.type) {
-    case 'marriage.post':
-      if (!body.marriageId) errors.handleError(400, 'marriageId is required');
-      muObj = await rdsMUsers.getUser(body.marriageId, decoded.id);
+    case 'wedding.post':
+      if (!body.weddingId) errors.handleError(400, 'weddingId is required');
+      muObj = await rdsMUsers.getUser(body.weddingId, decoded.id);
       logger.info('requested user ', muObj);
-      if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested marriage');
-      if (muObj.status !== MARRIAGE_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+      if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
+      if (muObj.status !== WEDDING_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
       break;
 
     default: errors.handleError(400, `unhandled post type ${body.type}`);
@@ -222,7 +222,7 @@ async function deletePost(request) {
   const post = await rdsPosts.getPost(id);
   if (_.isEmpty(post)) errors.handleError(404, 'post not found');
   if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
-  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'post', action: 'delete', data: { postId: id, marriageId: post.marriageId } })]);
+  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'post', action: 'delete', data: { postId: id, weddingId: post.weddingId } })]);
   return { success: true };
 }
 
@@ -231,12 +231,12 @@ async function getPost(request) {
   const { id } = request.pathParameters;
   const resp = await rdsPosts.getPost(id);
   if (_.isEmpty(resp)) errors.handleError(404, 'post not found');
-  const { userId, marriageId } = resp;
-  if (marriageId) {
-    const muObj = await rdsMUsers.getUser(marriageId, decoded.id);
+  const { userId, weddingId } = resp;
+  if (weddingId) {
+    const muObj = await rdsMUsers.getUser(weddingId, decoded.id);
     logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested marriage');
-    if (muObj.status !== MARRIAGE_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
+    if (muObj.status !== WEDDING_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
   }
   const tasks = [];
   tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
@@ -245,13 +245,13 @@ async function getPost(request) {
   tasks.push(rdsComments.commentsCountsIn([id], 'post'));
   tasks.push(getRecentLikes([`post_${id}`], decoded.id));
   tasks.push(getRecentComments([`post_${id}`]));
-  if (marriageId) tasks.push(rdsMarriages.getMarriage(marriageId));
-  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, marriage] = await Promise.all(tasks);
+  if (weddingId) tasks.push(rdsWeddings.getWedding(weddingId));
+  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, wedding] = await Promise.all(tasks);
   resp.user = user;
   resp.assets = assets;
   resp.likes = { type: 'collection', total: totalLikes[0], items: recentLikes.items, count: recentLikes.items.length };
   resp.comments = { type: 'collection', total: totalComments[0], items: recentComments.items, count: recentComments.items.length };
-  if (marriage) resp.marriage = marriage;
+  if (wedding) resp.wedding = wedding;
   return resp;
 }
 
