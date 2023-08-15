@@ -1,7 +1,7 @@
 {
   "name": "wedstage-bk-timeline",
   "version": "1.0.0",
-  "description": "manage timeline for wedstage users, marriages, etc.",
+  "description": "manage timeline for wedstage users, weddings, etc.",
   "main": "timelineHandler.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

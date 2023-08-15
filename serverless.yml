@@ -1,5 +1,5 @@
 service: wedstage-bk-timeline
-frameworkVersion: '3.30.1'
+frameworkVersion: '3.34.0'
 configValidationMode: error
 
 plugins:
