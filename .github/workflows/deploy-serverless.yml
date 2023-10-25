@@ -1,0 +1,31 @@
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+          token: "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"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Install Submodule Dependencies
+        run: |
+          (cd bk-utils && npm install)
+
+      - name: Deploy Serverless Application
+        run: npm run dev-deploy
+        env:
+          AWS_ACCESS_KEY_ID: "AKIAR6XFTAK6VCTJHZ56"
+          AWS_SECRET_ACCESS_KEY: "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"
+
