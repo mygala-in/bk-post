@@ -1,3 +1,5 @@
+name: Backend - Timeline service
+
 on: [push]
 
 jobs:
