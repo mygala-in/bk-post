@@ -25,7 +25,7 @@ jobs:
 
       - name: Dev Deploy Serverless Application
         run: |
-          if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+          if [[ ${{ github.ref }} == 'refs/heads/mygala2.0' ]]; then
             npm run dev-deploy
           fi
         env:
