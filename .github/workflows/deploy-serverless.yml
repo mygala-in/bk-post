@@ -1,4 +1,4 @@
-name: Backend - Timeline service
+name: Deployment - Timeline service
 
 on: [push]
 
