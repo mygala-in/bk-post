@@ -23,9 +23,18 @@ jobs:
         run: |
           (cd bk-utils && npm install)
 
-      - name: Deploy Serverless Application
-        run: npm run dev-deploy
+      - name: Dev Deploy Serverless Application
+        run: |
+          if [ github.ref == 'refs/heads/main' ]; then
+            npm run dev-deploy
+          fi
         env:
           AWS_ACCESS_KEY_ID: "AKIAR6XFTAK6VCTJHZ56"
           AWS_SECRET_ACCESS_KEY: "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"
+
+      # - name: Deploy Serverless Application
+      #   run: npm run dev-deploy
+      #   env:
+      #     AWS_ACCESS_KEY_ID: "AKIAR6XFTAK6VCTJHZ56"
+      #     AWS_SECRET_ACCESS_KEY: "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"
 
