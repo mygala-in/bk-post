@@ -6,3 +6,4 @@ jobs:
       mygala-in/bk-deployer/.github/workflows/serverless-deployer.yml@main
     with:
       repo-name: ${{ github.repository }}
+
