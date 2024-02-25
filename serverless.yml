@@ -1,5 +1,5 @@
 service: mygala-bk-timeline
-frameworkVersion: '3.36.0'
+frameworkVersion: '3.38.0'
 configValidationMode: error
 
 plugins:
@@ -39,7 +39,7 @@ custom:
 provider:
   name: aws
   timeout: 12
-  runtime: nodejs14.x
+  runtime: nodejs16.x
   region: ap-south-1
   stage: ${opt:stage, 'dev'}
   iam:
