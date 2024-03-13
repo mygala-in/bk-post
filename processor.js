@@ -5,7 +5,7 @@ const errors = require('./bk-utils/errors');
 const common = require('./bk-utils/common');
 const redis = require('./bk-utils/redis.helper');
 const constants = require('./bk-utils/constants');
-const snsHelper = require('./bk-utils/sns.helper');
+const snsHelper = require('./bk-utils/internet/sns.helper');
 const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsUsers = require('./bk-utils/rds/rds.users.helper');
@@ -74,16 +74,19 @@ async function newPost(message) {
     default:
   }
   logger.info(`title :: ${title}`);
-  await snsHelper.pushToSNS('fcm', { service: 'notification',
+  await snsHelper.pushToSNS('fcm', {
+    service: 'notification',
     component: 'notification',
     action: 'new',
-    data: { id: `${postId}`,
+    data: {
+      id: `${postId}`,
       type: 'default',
       title,
       topic: common.getTopicName('wedding', weddingId),
       groupId: APP_NOTIFICATIONS.channels.profile,
       payload: { screen: '/post-screen', args: { postId, useCache: false } },
-    } });
+    }
+  });
   logger.info('completed adding post to user timelines');
 }
 
@@ -222,7 +225,8 @@ async function newLike(message) {
 
   switch (resource) {
     case 'post':
-      await snsHelper.pushToSNS('fcm', { service: 'notification',
+      await snsHelper.pushToSNS('fcm', {
+        service: 'notification',
         component: 'notification',
         action: 'new',
         data: {
@@ -232,11 +236,13 @@ async function newLike(message) {
           topic,
           groupId: APP_NOTIFICATIONS.channels.post,
           payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
-        } });
+        }
+      });
       break;
 
     case 'comment':
-      await snsHelper.pushToSNS('fcm', { service: 'notification',
+      await snsHelper.pushToSNS('fcm', {
+        service: 'notification',
         component: 'notification',
         action: 'new',
         data: {
@@ -246,7 +252,8 @@ async function newLike(message) {
           topic,
           groupId: APP_NOTIFICATIONS.channels.post,
           payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
-        } });
+        }
+      });
       break;
     default:
   }
@@ -301,7 +308,8 @@ async function newComment(message) {
   await rdsComments.recountComments(comment.parentId);
   switch (resource) {
     case 'post':
-      await snsHelper.pushToSNS('fcm', { service: 'notification',
+      await snsHelper.pushToSNS('fcm', {
+        service: 'notification',
         component: 'notification',
         action: 'new',
         data: {
@@ -311,7 +319,8 @@ async function newComment(message) {
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
           payload: { screen: '/post-screen', args: { postId: parseInt(entityId, 10), useCache: false } },
-        } });
+        }
+      });
       break;
     default:
   }
