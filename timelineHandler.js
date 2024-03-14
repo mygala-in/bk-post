@@ -28,13 +28,13 @@ async function getRecentLikes(parentIds, userId) {
     if (parentIds.length === 0) return resp;
     const tasks = [];
     for (let i = 0; i < parentIds.length; i += 1) {
-      tasks.push(redis.lrange(`${parentIds[i]}_recent_likes`, 'int'));
+      tasks.push(redis.lrange(`${redis.transformKey(parentIds[i])}_recent_likes`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const likeIds = _.flatten(cache);
     logger.info('recent like ids', JSON.stringify(likeIds));
     if (likeIds.length > 0) {
-      resp.items = await redis.mget(likeIds.map((k) => `like_${k}`), 'json');
+      resp.items = await redis.mget(likeIds.map((k) => `{like}_${k}`), 'json');
       resp.items = resp.items.filter((k) => k !== null);
       resp.count = resp.items.length;
     }
@@ -75,14 +75,14 @@ async function getRecentComments(parentIds) {
     if (parentIds.length === 0) return resp;
     const tasks = [];
     for (let i = 0; i < parentIds.length; i += 1) {
-      tasks.push(redis.lrange(`${parentIds[i]}_recent_comments`, 'int'));
+      tasks.push(redis.lrange(`${redis.transformKey(parentIds[i])}_recent_comments`, 'int'));
     }
     const cache = await Promise.all(tasks);
     const commentIds = _.flatten(cache);
     logger.info('recent comment ids', JSON.stringify(commentIds));
     if (commentIds.length === 0) return resp;
 
-    resp.items = await redis.mget(commentIds.map((k) => `comment_${k}`), 'json');
+    resp.items = await redis.mget(commentIds.map((k) => `{comment}_${k}`), 'json');
     resp.items = resp.items.filter((k) => k !== null);
     resp.count = resp.items.length;
     logger.info('final recent comments ', JSON.stringify(resp));
