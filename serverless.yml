@@ -44,12 +44,12 @@ provider:
   stage: ${opt:stage, 'dev'}
   iam:
     role: ${self:custom.config.lambdaRole}
-  vpc:
-    securityGroupIds:
-      - ${self:custom.config.securityGroup}
-    subnetIds:
-      - ${self:custom.config.subnet1}
-      - ${self:custom.config.subnet2}
+  # vpc:
+  #   securityGroupIds:
+  #     - ${self:custom.config.securityGroup}
+  #   subnetIds:
+  #     - ${self:custom.config.subnet1}
+  #     - ${self:custom.config.subnet2}
   endpointType: REGIONAL
   deploymentBucket: ${self:provider.stage}-mygala-serverless-deployments
   environment: ${file(./bk-config/envs.${self:provider.stage}.json)}
