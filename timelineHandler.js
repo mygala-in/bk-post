@@ -12,7 +12,7 @@ const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
 const rdsWeddings = require('./bk-utils/rds/rds.weddings.helper');
-const rdsMUsers = require('./bk-utils/rds/rds.wedding.users.helper');
+const rdsWUsers = require('./bk-utils/rds/rds.wedding.users.helper');
 
 const { WEDDING_CONFIG, MINI_PROFILE_FIELDS } = constants;
 
@@ -238,7 +238,7 @@ async function newPost(request) {
   switch (body.type) {
     case 'wedding.post':
       if (!body.weddingId) errors.handleError(400, 'weddingId is required');
-      muObj = await rdsMUsers.getUser(body.weddingId, decoded.id);
+      muObj = await rdsWUsers.getUser(body.weddingId, decoded.id);
       logger.info('requested user ', muObj);
       if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
       if (muObj.status !== WEDDING_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
@@ -279,7 +279,7 @@ async function getPost(request) {
   if (_.isEmpty(resp)) errors.handleError(404, 'post not found');
   const { userId, weddingId } = resp;
   if (weddingId) {
-    const muObj = await rdsMUsers.getUser(weddingId, decoded.id);
+    const muObj = await rdsWUsers.getUser(weddingId, decoded.id);
     logger.info('requested user ', muObj);
     if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
     if (muObj.status !== WEDDING_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
