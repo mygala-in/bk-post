@@ -439,7 +439,7 @@ async function invoke(event, context, callback) {
         resp = await getTimeline(request);
         break;
 
-      case '/v1/{weddindId}/list':
+      case '/v1/wedding/{weddingId}/list':
         resp = await getWeddingTimeline(request);
         break;
 

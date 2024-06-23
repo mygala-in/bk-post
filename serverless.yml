@@ -72,7 +72,7 @@ functions:
           method: any
           cors: ${self:custom.customCors}
       - http:
-          path: /v1/{weddindId}/list
+          path: /v1/wedding/{weddingId}/list
           method: get
           cors: ${self:custom.customCors}
       - http:
