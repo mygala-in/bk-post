@@ -1,5 +1,5 @@
 service: mygala-bk-timeline
-frameworkVersion: '3.38.0'
+frameworkVersion: '3.39'
 configValidationMode: error
 
 plugins:
