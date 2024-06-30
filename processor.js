@@ -50,17 +50,22 @@ async function getRootParent(parentId) {
 
 async function newPost(message) {
   const { postId, weddingId, userId } = message;
+
+  logger.info('adding post to wedding timeline ', postId);
+  const wtl = redis.transformKey(`wedding_${weddingId}_timeline`);
+  if (await redis.exists(wtl)) {
+    await redis.zadd(wtl, postId, postId);
+  } else logger.info('skipping wedding timeline update for ', wtl);
+
   logger.info('adding post to user timelines ', postId, JSON.stringify(message));
   const [mUsers, user, post] = await Promise.all([rdsWUsers.getUsers(weddingId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(postId)]);
   const ids = mUsers.items.map((u) => u.userId);
   logger.info('total wedding users ', ids.length);
   for (let i = 0; i < ids.length; i += 1) {
-    const key = `user_${ids[i]}_timeline`;
-    const exists = await redis.exists(key);
-    if (exists) {
-      await redis.zadd(key, postId, postId);
-      // await redis.expire(key, REDIS_CONFIG.timeline.user);
-    } else logger.info('skipping timeline update for ', key);
+    const utl = redis.transformKey(`user_${ids[i]}_timeline`);
+    if (await redis.exists(utl)) {
+      await redis.zadd(utl, postId, postId);
+    } else logger.info('skipping user timeline update for ', utl);
   }
   let title = '';
   logger.info(`post type :: ${post.type}`);
@@ -87,14 +92,19 @@ async function newPost(message) {
       payload: { screen: '/post-screen', args: { postId, useCache: false } },
     },
   });
-  logger.info('completed adding post to user timelines');
+  logger.info('completed adding post to user & wedding timelines');
 }
 
 
 async function deletePost(message) {
   const { postId, weddingId } = message;
   let { userIds } = message;
-  logger.info('removing post from user timelines ', postId, JSON.stringify(message));
+  logger.info('removing post from user & wedding timelines ', postId, JSON.stringify(message));
+
+  const wtl = redis.transformKey(`wedding_${weddingId}_timeline`);
+  if (await redis.exists(wtl)) {
+    await redis.zrem(wtl, postId);
+  }
 
   if (userIds) {
     logger.info('using users from request ', userIds.length);
@@ -105,39 +115,55 @@ async function deletePost(message) {
   }
 
   for (let i = 0; i < userIds.length; i += 1) {
-    const key = `user_${userIds[i]}_timeline`;
-    const exists = await redis.exists(key);
-    if (exists) {
-      await redis.zrem(key, postId);
-    } else logger.info('skipping timeline update for ', key);
+    const utl = redis.transformKey(`user_${userIds[i]}_timeline`);
+    if (await redis.exists(utl)) {
+      await redis.zrem(utl, postId);
+    } else logger.info('skipping timeline update for ', utl);
   }
   logger.info('completed removing post from user timelines');
 }
 
 
-async function generateTimeline(userId) {
+async function generateUserTimeline(userId) {
   logger.info('started generating timeline for user ', userId);
   const mJoins = await rdsWUsers.getWeddings(userId);
   const vIds = mJoins.items.filter((i) => i.status === WEDDING_CONFIG.status.verified).map((i) => i.weddingId);
   logger.info('verified wedding ids ', vIds);
 
+  const key = redis.transformKey(`user_${userId}_timeline`);
   const postIds = await rdsPosts.getWeddingPostIds(vIds);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   for (let i = 0; i < postIds.count; i += 1) {
     const id = postIds.items[i];
-    tasks.push(redis.zadd(`user_${userId}_timeline`, id, id));
+    tasks.push(redis.zadd(key, id, id));
   }
   await Promise.all(tasks);
-  await redis.expire(`user_${userId}_timeline`, REDIS_CONFIG.timeline.user);
+  await redis.expire(key, REDIS_CONFIG.timeline.user);
   logger.info('completed generating timeline for user');
+}
+
+
+async function generateWeddingTimeline(weddingId) {
+  logger.info('started generating timeline for wedding ', weddingId);
+  const postIds = await rdsPosts.getWeddingPostIds([weddingId]);
+  logger.info('total posts ', postIds.count);
+  const tasks = [];
+  const key = redis.transformKey(`wedding_${weddingId}_timeline`);
+  for (let i = 0; i < postIds.count; i += 1) {
+    const id = postIds.items[i];
+    tasks.push(redis.zadd(key, id, id));
+  }
+  await Promise.all(tasks);
+  await redis.expire(key, REDIS_CONFIG.timeline.wedding);
+  logger.info('completed generating timeline for wedding');
 }
 
 
 async function userJoined(message) {
   const { userId, weddingId } = message;
   logger.info('started adding wedding posts to user timeline ', { weddingId, userId });
-  const key = `user_${userId}_timeline`;
+  const key = redis.transformKey(`user_${userId}_timeline`);
   const exists = await redis.exists(key);
   if (!exists) {
     logger.info('user timeline does not exist, skipping action');
@@ -159,7 +185,7 @@ async function userJoined(message) {
 async function userExited(message) {
   const { userId, weddingId } = message;
   logger.info('started removing wedding posts from user timeline ', { weddingId, userId });
-  let key = `user_${userId}_timeline`;
+  let key = redis.transformKey(`user_${userId}_timeline`);
   let exists = await redis.exists(key);
   if (!exists) logger.info('user timeline does not exist, skipping action');
   else {
@@ -179,7 +205,7 @@ async function userExited(message) {
   logger.info('total wedding users ', userIds.length);
 
   for (let k = 0; k < userIds.length; k += 1) {
-    key = `user_${userIds[k]}_timeline`;
+    key = redis.transformKey(`user_${userIds[k]}_timeline`);
     exists = await redis.exists(key);
     if (exists) {
       await redis.zrem(key, postIds.items);
@@ -432,5 +458,6 @@ async function sns(request) {
 
 module.exports = {
   sns,
-  generateTimeline,
+  generateUserTimeline,
+  generateWeddingTimeline,
 };
