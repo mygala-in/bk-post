@@ -23,6 +23,14 @@ custom:
     basePath: 'timeline' # indication of backend service
     stage: ${self:provider.stage}
     createRoute53Record: false
+  vpc:
+    prod:
+      securityGroupIds:
+        - ${self:custom.config.securityGroup}
+      subnetIds:
+        - ${self:custom.config.subnet1}
+        - ${self:custom.config.subnet2}
+        - ${self:custom.config.subnet3}
   customCors:
     origin: '*'
     headers:
@@ -44,13 +52,7 @@ provider:
   stage: ${opt:stage, 'dev'}
   iam:
     role: ${self:custom.config.lambdaRole}
-  vpc:
-    securityGroupIds:
-      - ${self:custom.config.securityGroup}
-    subnetIds:
-      - ${self:custom.config.subnet1}
-      - ${self:custom.config.subnet2}
-      - ${self:custom.config.subnet3}
+  vpc: ${self:custom.vpc.${self:provider.stage}, null}
   endpointType: REGIONAL
   deploymentBucket: ${self:provider.stage}-mygala-serverless-deployments
   environment: ${file(./bk-config/envs.${self:provider.stage}.json)}
