@@ -54,7 +54,7 @@ provider:
     role: ${self:custom.config.lambdaRole}
   vpc: ${self:custom.vpc.${self:provider.stage}, null}
   endpointType: REGIONAL
-  deploymentBucket: ${self:provider.stage}-mygala-sls-deployments
+  deploymentBucket: ${self:provider.stage}-mygala-serverless-deployments
   environment: ${file(./bk-config/envs.${self:provider.stage}.json)}
 
 
