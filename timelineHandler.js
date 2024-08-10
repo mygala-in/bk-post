@@ -386,10 +386,10 @@ async function getComments(request) {
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const commentIds = resp.items.map((r) => r.id);
+  const commentIds = resp.items.map((r) => `comment_${r.id}`);
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
-    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds.map((c) => `comment_${c}`), decoded.id),
+    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds, decoded.id),
     getRecentComments(commentIds.map((c) => `comment_${c}`)),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
