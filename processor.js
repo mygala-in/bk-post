@@ -131,7 +131,7 @@ async function generateUserTimeline(userId) {
   logger.info('verified occasion ids ', vIds);
 
   const key = redis.transformKey(`user_${userId}_timeline`);
-  const postIds = await rdsPosts.getWeddingPostIds(vIds);
+  const postIds = await rdsPosts.getParentPostIds(vIds);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   for (let i = 0; i < postIds.count; i += 1) {
@@ -146,7 +146,7 @@ async function generateUserTimeline(userId) {
 
 async function generateOccasionTimeline(occasionId) {
   logger.info('started generating timeline for occasion ', occasionId);
-  const postIds = await rdsPosts.getWeddingPostIds([occasionId]);
+  const postIds = await rdsPosts.getParentPostIds([occasionId]);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   const key = redis.transformKey(`occasion_${occasionId}_timeline`);
@@ -169,7 +169,7 @@ async function userJoined(message) {
     logger.info('user timeline does not exist, skipping action');
     return;
   }
-  const postIds = await rdsPosts.getWeddingPostIds([occasionId]);
+  const postIds = await rdsPosts.getParentPostIds([occasionId]);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   for (let i = 0; i < postIds.count; i += 1) {
@@ -189,14 +189,14 @@ async function userExited(message) {
   let exists = await redis.exists(key);
   if (!exists) logger.info('user timeline does not exist, skipping action');
   else {
-    const postIds = await rdsPosts.getWeddingPostIds([occasionId]);
+    const postIds = await rdsPosts.getParentPostIds([occasionId]);
     logger.info('total occasion posts ', postIds.count);
     await redis.zrem(key, postIds.items);
     logger.info('completed removing occasion posts from user timeline');
   }
 
   logger.info('started removing user posts from all occasion users');
-  const postIds = await rdsPosts.getWeddingUserPostIds(occasionId, userId);
+  const postIds = await rdsPosts.getParentUserPostIds(occasionId, userId);
   logger.info('total user posts ', postIds.count);
   await rdsPosts.deletePosts(postIds.items);
 
