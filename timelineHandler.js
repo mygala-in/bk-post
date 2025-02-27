@@ -11,9 +11,7 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsWeddings = require('./bk-utils/rds/rds.weddings.helper');
 const rdsOccasions = require('./bk-utils/rds/rds.occasions.helper');
-const rdsWUsers = require('./bk-utils/rds/rds.wedding.users.helper');
 const rdsOUsers = require('./bk-utils/rds/rds.occasion.users.helper');
 
 const { OCCASION_CONFIG, MINI_PROFILE_FIELDS } = constants;
@@ -285,11 +283,11 @@ async function getPost(request) {
   const { id } = request.pathParameters;
   const resp = await rdsPosts.getPost(id);
   if (_.isEmpty(resp)) errors.handleError(404, 'post not found');
-  const { userId, weddingId } = resp;
-  if (weddingId) {
-    const muObj = await rdsWUsers.getUser(weddingId, decoded.id);
+  const { userId, occasionId } = resp;
+  if (occasionId) {
+    const muObj = await rdsOUsers.getUser(occasionId, decoded.id);
     logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
+    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
     if (muObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
   }
   const tasks = [];
@@ -299,13 +297,13 @@ async function getPost(request) {
   tasks.push(rdsComments.commentsCountsIn([id], 'post'));
   tasks.push(getRecentLikes([`post_${id}`], decoded.id));
   tasks.push(getRecentComments([`post_${id}`]));
-  if (weddingId) tasks.push(rdsWeddings.getWedding(weddingId));
-  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, wedding] = await Promise.all(tasks);
+  if (occasionId) tasks.push(rdsOccasions.getOccasion(occasionId));
+  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, occasion] = await Promise.all(tasks);
   resp.user = user;
   resp.assets = assets;
   resp.likes = { type: 'collection', total: totalLikes[0], items: recentLikes.items, count: recentLikes.items.length };
   resp.comments = { type: 'collection', total: totalComments[0], items: recentComments.items, count: recentComments.items.length };
-  if (wedding) resp.wedding = wedding;
+  if (occasion) resp.occasion = occasion;
   return resp;
 }
 
