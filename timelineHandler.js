@@ -3,6 +3,7 @@ const processor = require('./processor');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const access = require('./bk-utils/access');
+const common = require('./bk-utils/common');
 const redis = require('./bk-utils/redis.helper');
 const constants = require('./bk-utils/constants');
 const snsHelper = require('./bk-utils/sns.helper');
@@ -239,8 +240,7 @@ async function newPost(request) {
   switch (body.type) {
     case 'image':
       if (body.parentId) {
-        const [resource, ...entityIdx] = body.parentId.split('_');
-        const entityId = entityIdx.join('_');
+        const { entityId, resource } = common.getEntityResource(body.parentId);
         if (resource === 'occasion') {
           muObj = await rdsOUsers.getUser(entityId, decoded.id);
           logger.info('requested user ', muObj);
