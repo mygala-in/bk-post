@@ -73,10 +73,10 @@ functions:
           path: /v1/list
           method: any
           cors: ${self:custom.customCors}
-      # - http:
-      #     path: /v1/occasion/{occasionId}/list
-      #     method: get
-      #     cors: ${self:custom.customCors}
+      - http:
+          path: /v1/occasion/{occasionId}/list
+          method: get
+          cors: ${self:custom.customCors}
       - http:
           path: /v1/new
           method: post
