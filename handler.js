@@ -283,9 +283,11 @@ async function getPost(request) {
   const { id } = request.pathParameters;
   const resp = await rdsPosts.getPost(id);
   if (_.isEmpty(resp)) errors.handleError(404, 'post not found');
-  const { userId, occasionId } = resp;
-  if (occasionId) {
-    const muObj = await rdsOUsers.getUser(occasionId, decoded.id);
+  const { userId, parentId } = resp;
+  const { entityId } = common.getEntityResource(parentId);
+
+  if (entityId) {
+    const muObj = await rdsOUsers.getUser(entityId, decoded.id);
     logger.info('requested user ', muObj);
     if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
     if (muObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
@@ -297,7 +299,7 @@ async function getPost(request) {
   tasks.push(rdsComments.commentsCountsIn([id], 'post'));
   tasks.push(getRecentLikes([`post_${id}`], decoded.id));
   tasks.push(getRecentComments([`post_${id}`]));
-  if (occasionId) tasks.push(rdsOccasions.getOccasion(occasionId));
+  if (entityId) tasks.push(rdsOccasions.getOccasion(entityId));
   const [user, assets, totalLikes, totalComments, recentLikes, recentComments, occasion] = await Promise.all(tasks);
   resp.user = user;
   resp.assets = assets;
