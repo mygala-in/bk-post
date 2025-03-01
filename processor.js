@@ -127,7 +127,7 @@ async function deletePost(message) {
 async function generateUserTimeline(userId) {
   logger.info('started generating timeline for user ', userId);
   const mJoins = await rdsOUsers.getOccasions(userId);
-  const vIds = mJoins.items.filter((i) => i.status === OCCASION_CONFIG.status.verified).map((i) => i.occasionId);
+  const vIds = mJoins.items.filter((i) => i.status === OCCASION_CONFIG.status.verified).map((i) => `${i.type}_${i.occasionId}`);
   logger.info('verified occasion ids ', vIds);
 
   const key = redis.transformKey(`user_${userId}_timeline`);
