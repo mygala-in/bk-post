@@ -217,8 +217,7 @@ async function userExited(message) {
 
 async function newLike(message) {
   const { id, userId, parentId } = message;
-  const [resource, ...entityIdx] = parentId.split('_');
-  const entityId = entityIdx.join('_');
+  const { entityId, resource } = common.getEntityResource(parentId);
 
   const [parent, like, user] = await Promise.all([getRootParent(parentId), rdsLikes.getLike(id), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS)]);
   logger.info('root parent ', JSON.stringify(parent));
