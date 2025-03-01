@@ -56,7 +56,7 @@ async function newPost(message) {
   const { insertId } = await rdsPosts.insertPost({ userId, parentId, type, status });
 
   logger.info('adding post to occasion timeline ', insertId);
-  const wtl = redis.transformKey(`occasion_${entityId}_timeline`);
+  const wtl = redis.transformKey(`occasion_${entityId}_posts`);
   if (await redis.exists(wtl)) {
     await redis.zadd(wtl, insertId, insertId);
   } else logger.info('skipping occasion timeline update for ', wtl);
@@ -66,7 +66,7 @@ async function newPost(message) {
   const ids = mUsers.items.map((u) => u.userId);
   logger.info('total occasion users ', ids.length);
   for (let i = 0; i < ids.length; i += 1) {
-    const utl = redis.transformKey(`user_${ids[i]}_timeline`);
+    const utl = redis.transformKey(`user_${ids[i]}_posts`);
     if (await redis.exists(utl)) {
       await redis.zadd(utl, insertId, insertId);
     } else logger.info('skipping user timeline update for ', utl);
@@ -106,7 +106,7 @@ async function deletePost(message) {
   let { userIds } = message;
   logger.info('removing post from user & occasion timelines ', postId, JSON.stringify(message));
 
-  const wtl = redis.transformKey(`occasion_${entityId}_timeline`);
+  const wtl = redis.transformKey(`occasion_${entityId}_posts`);
   if (await redis.exists(wtl)) {
     await redis.zrem(wtl, postId);
   }
@@ -120,7 +120,7 @@ async function deletePost(message) {
   }
 
   for (let i = 0; i < userIds.length; i += 1) {
-    const utl = redis.transformKey(`user_${userIds[i]}_timeline`);
+    const utl = redis.transformKey(`user_${userIds[i]}_posts`);
     if (await redis.exists(utl)) {
       await redis.zrem(utl, postId);
     } else logger.info('skipping timeline update for ', utl);
@@ -135,7 +135,7 @@ async function generateUserTimeline(userId) {
   const vIds = mJoins.items.filter((i) => i.status === OCCASION_CONFIG.status.verified).map((i) => `${i.type}_${i.occasionId}`);
   logger.info('verified occasion ids ', vIds);
 
-  const key = redis.transformKey(`user_${userId}_timeline`);
+  const key = redis.transformKey(`user_${userId}_posts`);
   const postIds = await rdsPosts.getParentPostIds(vIds);
   logger.info('total posts ', postIds.count);
   const tasks = [];
@@ -154,7 +154,7 @@ async function generateOccasionTimeline(occasionId) {
   const postIds = await rdsPosts.getParentPostIds([occasionId]);
   logger.info('total posts ', postIds.count);
   const tasks = [];
-  const key = redis.transformKey(`occasion_${occasionId}_timeline`);
+  const key = redis.transformKey(`occasion_${occasionId}_posts`);
   for (let i = 0; i < postIds.count; i += 1) {
     const id = postIds.items[i];
     tasks.push(redis.zadd(key, id, id));
@@ -168,7 +168,7 @@ async function generateOccasionTimeline(occasionId) {
 async function userJoined(message) {
   const { userId, occasionId } = message;
   logger.info('started adding occasion posts to user timeline ', { occasionId, userId });
-  const key = redis.transformKey(`user_${userId}_timeline`);
+  const key = redis.transformKey(`user_${userId}_posts`);
   const exists = await redis.exists(key);
   if (!exists) {
     logger.info('user timeline does not exist, skipping action');
@@ -190,7 +190,7 @@ async function userJoined(message) {
 async function userExited(message) {
   const { userId, occasionId } = message;
   logger.info('started removing occasion posts from user timeline ', { occasionId, userId });
-  let key = redis.transformKey(`user_${userId}_timeline`);
+  let key = redis.transformKey(`user_${userId}_posts`);
   let exists = await redis.exists(key);
   if (!exists) logger.info('user timeline does not exist, skipping action');
   else {
@@ -210,7 +210,7 @@ async function userExited(message) {
   logger.info('total occasion users ', userIds.length);
 
   for (let k = 0; k < userIds.length; k += 1) {
-    key = redis.transformKey(`user_${userIds[k]}_timeline`);
+    key = redis.transformKey(`user_${userIds[k]}_posts`);
     exists = await redis.exists(key);
     if (exists) {
       await redis.zrem(key, postIds.items);
@@ -408,13 +408,13 @@ async function deleteComment(message) {
 }
 
 async function sns(request) {
-  logger.info('received timeline processor sns event');
+  logger.info('received post processor sns event');
   logger.info(JSON.stringify(request));
   try {
     const message = JSON.parse(request.Records[0].Sns.Message);
     logger.info(JSON.stringify(message));
     const { service, action, component, data } = message;
-    if (service !== 'timeline') errors.handleError(400, `invalid service event ${service}, sent for timeline processor`);
+    if (service !== 'post') errors.handleError(400, `invalid service event ${service}, sent for post processor`);
 
     switch (component) {
       case 'like':

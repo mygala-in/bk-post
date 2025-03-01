@@ -1,4 +1,4 @@
-service: mygala-bk-timeline
+service: mygala-bk-post
 frameworkVersion: '3.40'
 configValidationMode: error
 
@@ -20,7 +20,7 @@ custom:
   customDomain:
     # Ex: serverless create_domain --stage dev
     domainName: ${self:custom.domains.${self:provider.stage}}
-    basePath: 'timeline' # indication of backend service
+    basePath: 'post' # indication of backend service
     stage: ${self:provider.stage}
     createRoute53Record: false
   vpc:
@@ -59,14 +59,14 @@ provider:
 
 
 functions:
-  timeline-bg-tasks:
+  post-bg-tasks:
     timeout: 60
-    name: ${self:custom.config.envPrefix}-timeline-bg-tasks
+    name: ${self:custom.config.envPrefix}-post-bg-tasks
     handler: processor.sns
     events:
-      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline-bg-tasks
-  timeline-apis:
-    name: ${self:custom.config.envPrefix}-timeline-apis
+      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-post-bg-tasks
+  post-apis:
+    name: ${self:custom.config.envPrefix}-post-apis
     handler: handler.invoke
     events:
       - http:
@@ -108,7 +108,7 @@ resources:
     isProd: {"Fn::Equals" : ["${self:provider.stage}", "prod"]}
     isDev: {"Fn::Equals" : ["${self:provider.stage}", "dev"]}
   Resources:
-    TimelineBgTasksSNS:
+    PostBgTasksSNS:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: ${self:custom.config.envPrefix}-timeline-bg-tasks
+        TopicName: ${self:custom.config.envPrefix}-post-bg-tasks

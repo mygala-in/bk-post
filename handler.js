@@ -95,7 +95,7 @@ async function getRecentComments(parentIds) {
 
 async function postsAfter(key, postId, size) {
   const total = await redis.zcard(key);
-  logger.info('total timeline items ', total);
+  logger.info('total post items ', total);
   let rank = await redis.zrank(key, postId);
   if (rank == null) rank = 0;
   else rank += 1;
@@ -108,7 +108,7 @@ async function postsAfter(key, postId, size) {
 
 async function postsBefore(key, postId, size) {
   const total = await redis.zcard(key);
-  logger.info('total timeline items ', total);
+  logger.info('total post items ', total);
   let rank = await redis.zrevrank(key, postId);
   if (rank == null) rank = 0;
   else rank += 1;
@@ -121,14 +121,14 @@ async function postsBefore(key, postId, size) {
 
 async function recentPosts(key, size) {
   const total = await redis.zcard(key);
-  logger.info('total timeline items ', total);
+  logger.info('total post items ', total);
   const [st, end] = [0, size - 1];
   const ids = await redis.zrevrange(key, 'int', st, end);
   return { ids, total };
 }
 
 
-async function timelinePosts(action, key, postId, size) {
+async function getPostIds(action, key, postId, size) {
   switch (action) {
     case 'recent':
       return recentPosts(key, size);
@@ -142,18 +142,18 @@ async function timelinePosts(action, key, postId, size) {
 }
 
 
-async function getTimeline(request) {
+async function getUserPosts(request) {
   const { decoded } = request;
   const { action } = request.queryStringParameters;
   let { postId, size } = request.queryStringParameters;
   postId = parseInt(postId, 10);
   size = parseInt(size, 10);
-  const key = redis.transformKey(`user_${decoded.id}_timeline`);
+  const key = redis.transformKey(`user_${decoded.id}_posts`);
   const exists = await redis.exists(key);
   if (!exists) await processor.generateUserTimeline(decoded.id);
 
-  const { ids, total } = await timelinePosts(action, key, postId, size);
-  logger.info('paginated timeline items ', ids);
+  const { ids, total } = await getPostIds(action, key, postId, size);
+  logger.info('paginated post items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const parentIds = ids.map((i) => `post_${i}`);
@@ -188,7 +188,7 @@ async function getTimeline(request) {
 }
 
 
-async function getOccasionTimeline(request) {
+async function getOccasionPosts(request) {
   const { decoded } = request;
   const { occasionId } = request.pathParameters;
   const { action } = request.queryStringParameters;
@@ -200,11 +200,11 @@ async function getOccasionTimeline(request) {
   logger.info('requested user ', muObj);
   if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
 
-  const key = redis.transformKey(`occasion_${occasionId}_timeline`);
+  const key = redis.transformKey(`occasion_${occasionId}_posts`);
   if (!await redis.exists(key)) await processor.generateOccasionTimeline(occasionId);
 
-  const { ids, total } = await timelinePosts(action, key, postId, size);
-  logger.info('paginated timeline items ', ids);
+  const { ids, total } = await getPostIds(action, key, postId, size);
+  logger.info('paginated post items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const parentIds = ids.map((i) => `post_${i}`);
@@ -274,7 +274,7 @@ async function deletePost(request) {
   const post = await rdsPosts.getPost(id);
   if (_.isEmpty(post)) errors.handleError(404, 'post not found');
   if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
-  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'post', action: 'delete', data: { postId: id, parentId: post.parentId } })]);
+  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'post', action: 'delete', data: { postId: id, parentId: post.parentId } })]);
   return { success: true };
 }
 
@@ -316,7 +316,7 @@ async function likeAction(request) {
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'add', data: resp });
+  await snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'like', action: 'add', data: resp });
   resp.user = user;
   return resp;
 }
@@ -332,7 +332,7 @@ async function unlikeAction(request) {
 
   await Promise.all([
     rdsLikes.deleteLike(id),
-    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'delete', data: like }),
+    snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'like', action: 'delete', data: like }),
   ]);
   return { success: true };
 }
@@ -344,7 +344,7 @@ async function newComment(request) {
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, text: body.text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'add', data: resp });
+  await snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'comment', action: 'add', data: resp });
   resp.user = user;
   return resp;
 }
@@ -360,7 +360,7 @@ async function deleteComment(request) {
 
   await Promise.all([
     rdsComments.deleteComment(id),
-    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'delete', data: comment }),
+    snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'comment', action: 'delete', data: comment }),
   ]);
   return { success: true };
 }
@@ -376,7 +376,7 @@ async function editComment(request) {
 
   await Promise.all([
     rdsComments.updateComment(id, { ...body }),
-    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'edit', data: comment }),
+    snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'comment', action: 'edit', data: comment }),
   ]);
   Object.assign(comment, body);
   return comment;
@@ -448,11 +448,11 @@ async function invoke(event, context, callback) {
         break;
 
       case '/v1/list':
-        resp = await getTimeline(request);
+        resp = await getUserPosts(request);
         break;
 
       case '/v1/occasion/{occasionId}/list':
-        resp = await getOccasionTimeline(request);
+        resp = await getOccasionPosts(request);
         break;
 
       case '/v1/{id}':
