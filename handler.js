@@ -441,16 +441,16 @@ async function invoke(event, context, callback) {
 
     let resp = {};
     switch (request.resourcePath) {
+      case '/v1/new':
+        resp = await newPost(request);
+        break;
+
       case '/v1/list':
         resp = await getTimeline(request);
         break;
 
       case '/v1/occasion/{occasionId}/list':
         resp = await getOccasionTimeline(request);
-        break;
-
-      case '/v1/new':
-        resp = await newPost(request);
         break;
 
       case '/v1/{id}':
