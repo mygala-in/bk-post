@@ -49,22 +49,26 @@ async function getRootParent(parentId) {
 
 
 async function newPost(message) {
-  const { postId, occasionId, userId } = message;
+  const { userId, parentId, type, status } = message;
+  const { entityId } = common.getEntityResource(parentId);
 
-  logger.info('adding post to occasion timeline ', postId);
-  const wtl = redis.transformKey(`occasion_${occasionId}_timeline`);
+  logger.info('creating new post ', JSON.stringify(message));
+  const { insertId } = await rdsPosts.insertPost({ userId, parentId, type, status });
+
+  logger.info('adding post to occasion timeline ', insertId);
+  const wtl = redis.transformKey(`occasion_${entityId}_timeline`);
   if (await redis.exists(wtl)) {
-    await redis.zadd(wtl, postId, postId);
+    await redis.zadd(wtl, insertId, insertId);
   } else logger.info('skipping occasion timeline update for ', wtl);
 
-  logger.info('adding post to user timelines ', postId, JSON.stringify(message));
-  const [mUsers, user, post] = await Promise.all([rdsOUsers.getUsers(occasionId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(postId)]);
+  logger.info('adding post to user timelines ', insertId, JSON.stringify(message));
+  const [mUsers, user, post] = await Promise.all([rdsOUsers.getUsers(entityId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(insertId)]);
   const ids = mUsers.items.map((u) => u.userId);
   logger.info('total occasion users ', ids.length);
   for (let i = 0; i < ids.length; i += 1) {
     const utl = redis.transformKey(`user_${ids[i]}_timeline`);
     if (await redis.exists(utl)) {
-      await redis.zadd(utl, postId, postId);
+      await redis.zadd(utl, insertId, insertId);
     } else logger.info('skipping user timeline update for ', utl);
   }
   let title = '';
@@ -84,12 +88,12 @@ async function newPost(message) {
     component: 'notification',
     action: 'new',
     data: {
-      id: `${postId}`,
+      id: `${insertId}`,
       type: 'default',
       title,
-      topic: common.getTopicName('occasion', occasionId),
+      topic: common.getTopicName('occasion', entityId),
       groupId: APP_NOTIFICATIONS.channels.profile,
-      payload: { screen: `/posts/${postId}`, params: { useCache: 'false' } },
+      payload: { screen: `/posts/${insertId}`, params: { useCache: 'false' } },
     },
   });
   logger.info('completed adding post to user & occasion timelines');
@@ -97,11 +101,12 @@ async function newPost(message) {
 
 
 async function deletePost(message) {
-  const { postId, occasionId } = message;
+  const { postId, parentId } = message;
+  const { entityId } = common.getEntityResource(parentId);
   let { userIds } = message;
   logger.info('removing post from user & occasion timelines ', postId, JSON.stringify(message));
 
-  const wtl = redis.transformKey(`occasion_${occasionId}_timeline`);
+  const wtl = redis.transformKey(`occasion_${entityId}_timeline`);
   if (await redis.exists(wtl)) {
     await redis.zrem(wtl, postId);
   }
@@ -109,7 +114,7 @@ async function deletePost(message) {
   if (userIds) {
     logger.info('using users from request ', userIds.length);
   } else {
-    const mUsers = await rdsOUsers.getUsers(occasionId);
+    const mUsers = await rdsOUsers.getUsers(entityId);
     userIds = mUsers.items.map((user) => user.userId);
     logger.info('total occasion users ', userIds.length);
   }
