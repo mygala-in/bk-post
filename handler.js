@@ -295,8 +295,8 @@ async function getPost(request) {
   const tasks = [];
   tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
   tasks.push(rdsAssets.getParentAssets(`post_${id}`));
-  tasks.push(rdsLikes.likesCountsIn([id], 'post'));
-  tasks.push(rdsComments.commentsCountsIn([id], 'post'));
+  tasks.push(rdsLikes.likesCountsIn([`post_${id}`]));
+  tasks.push(rdsComments.commentsCountsIn([`post_${id}`]));
   tasks.push(getRecentLikes([`post_${id}`], decoded.id));
   tasks.push(getRecentComments([`post_${id}`]));
   if (entityId) tasks.push(rdsOccasions.getOccasion(entityId));
@@ -397,7 +397,7 @@ async function getComments(request) {
   const commentIds = resp.items.map((r) => `comment_${r.id}`);
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
-    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds, decoded.id),
+    rdsLikes.likesCountsIn(commentIds), rdsComments.commentsCountsIn(commentIds), getRecentLikes(commentIds, decoded.id),
     getRecentComments(commentIds.map((c) => `comment_${c}`)),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
