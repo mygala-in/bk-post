@@ -231,7 +231,7 @@ async function newLike(message) {
     let muObj;
     switch (parent.entity) {
       case 'post':
-        if (_.contains(parent, 'parentId')) {
+        if (_.has(parent, 'parentId')) {
           const occasionId = common.getEntityResource(parent.parentId).entityId;
           muObj = await rdsOUsers.getUser(occasionId, userId);
           logger.info('requested user ', muObj);
@@ -240,8 +240,8 @@ async function newLike(message) {
             await rdsLikes.deleteLike(id);
             return;
           }
-          topic = common.getTopicName('user', parent.userId);
         }
+        topic = common.getTopicName('user', parent.userId);
         break;
 
       default:
