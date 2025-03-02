@@ -18,11 +18,13 @@ const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, OCCASION_CONFIG } = cons
 
 
 function getRecentLikesKey(like) {
-  return `${like.parentId}_recent_likes`;
+  const { resource, entityId } = common.getEntityResource(like.parentId);
+  return `{${resource}}_${entityId}_recent_likes`;
 }
 
 function getRecentCommentsKey(comment) {
-  return `${comment.parentId}_recent_comments`;
+  const { resource, entityId } = common.getEntityResource(comment.parentId);
+  return `{${resource}}_${entityId}_recent_comments`;
 }
 
 
@@ -324,8 +326,10 @@ async function newComment(message) {
   const [resource, ...entityIdx] = parentId.split('_');
   const entityId = entityIdx.join('_');
   const [post, user, comment] = await Promise.all([rdsPosts.getPost(entityId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
-  const { occasionId } = post;
-  if (occasionId) {
+  logger.info('parent post ', JSON.stringify(post));
+
+  if (_.has(post, 'parentId')) {
+    const occasionId = common.getEntityResource(post.parentId).entityId;
     const muObj = await rdsOUsers.getUser(occasionId, userId);
     logger.info('requested user ', muObj);
     if (_.isEmpty(muObj) || muObj.status !== OCCASION_CONFIG.status.verified || _.isEmpty(post)) {
@@ -335,7 +339,7 @@ async function newComment(message) {
     }
   }
   comment.user = user;
-  await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
+  await redis.set(redis.transformKey(`comment_${id}`), JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
   await rdsComments.recountComments(comment.parentId);
   switch (resource) {
@@ -380,7 +384,7 @@ async function editComment(message) {
   const [user, comment] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsComments.getComment(id)]);
 
   comment.user = user;
-  await redis.set(`comment_${id}`, JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
+  await redis.set(redis.transformKey(`comment_${id}`), JSON.stringify(comment), REDIS_CONFIG.timeline.comments);
 
   const key = getRecentCommentsKey(comment);
   logger.info('recent comments key ', key);
@@ -403,7 +407,7 @@ async function editComment(message) {
 async function deleteComment(message) {
   const { id } = message;
   const comment = await rdsComments.getComment(id);
-  await Promise.all([rdsComments.recountComments(comment.parentId), redis.del(`comment_${id}`)]);
+  await Promise.all([rdsComments.recountComments(comment.parentId), redis.del(redis.transformKey(`comment_${id}`))]);
   const key = getRecentCommentsKey(comment);
   if (key) await redis.lrem(key, id);
   logger.info('completed uncomment actions');
