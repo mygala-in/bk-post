@@ -83,7 +83,7 @@ async function getRecentComments(parentIds) {
     logger.info('recent comment ids', JSON.stringify(commentIds));
     if (commentIds.length === 0) return resp;
 
-    resp.items = await redis.mget(commentIds.map((k) => `{comment}_${k}`), 'json');
+    resp.items = await redis.mget(commentIds.map((k) => redis.transformKey(`comment_${k}`)), 'json');
     resp.items = resp.items.filter((k) => k !== null);
     resp.count = resp.items.length;
     logger.info('final recent comments ', JSON.stringify(resp));
@@ -394,11 +394,11 @@ async function getComments(request) {
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const commentIds = resp.items.map((r) => `comment_${r.id}`);
+  const commentIds = resp.items.map((r) => redis.transformKey(`comment_${r.id}`));
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
     rdsLikes.likesCountsIn(commentIds), rdsComments.commentsCountsIn(commentIds), getRecentLikes(commentIds, decoded.id),
-    getRecentComments(commentIds.map((c) => `comment_${c}`)),
+    getRecentComments(commentIds.map((c) => redis.transformKey(`comment_${c}`))),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
     const comment = resp.items[i];
