@@ -27,8 +27,7 @@ function getRecentCommentsKey(comment) {
 
 
 async function getRootParent(parentId) {
-  const [resource, ...entityIdx] = parentId.split('_');
-  const entityId = entityIdx.join('_');
+  const { entityId, resource } = common.getEntityResource(parentId);
 
   let parent;
   switch (resource) {
@@ -232,14 +231,17 @@ async function newLike(message) {
     let muObj;
     switch (parent.entity) {
       case 'post':
-        muObj = await rdsOUsers.getUser(parent.occasionId, userId);
-        logger.info('requested user ', muObj);
-        if (_.isEmpty(muObj) || muObj.status !== OCCASION_CONFIG.status.verified || _.isEmpty(parent)) {
-          logger.warn('unauthorized like action');
-          await rdsLikes.deleteLike(id);
-          return;
+        if (_.contains(parent, 'parentId')) {
+          const occasionId = common.getEntityResource(parent.parentId).entityId;
+          muObj = await rdsOUsers.getUser(occasionId, userId);
+          logger.info('requested user ', muObj);
+          if (_.isEmpty(muObj) || muObj.status !== OCCASION_CONFIG.status.verified || _.isEmpty(parent)) {
+            logger.warn('unauthorized like action');
+            await rdsLikes.deleteLike(id);
+            return;
+          }
+          topic = common.getTopicName('user', parent.userId);
         }
-        topic = common.getTopicName('user', parent.userId);
         break;
 
       default:
