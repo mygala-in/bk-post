@@ -103,8 +103,17 @@ async function newPost(message) {
 
 async function deletePost(message) {
   const { postId, parentId } = message;
-  const { entityId } = common.getEntityResource(parentId);
   let { userIds } = message;
+
+  logger.info('deleting post ', postId);
+  const key = redis.transformKey(`post_${postId}`);
+  await Promise.all([
+    rdsPosts.deletePost(postId),
+    redis.del(redis.transformKey(`${key}_likes_count`)),
+    redis.del(redis.transformKey(`${key}_comments_count`)),
+  ]);
+
+  const { entityId } = common.getEntityResource(parentId);
   logger.info('removing post from user & occasion timelines ', postId, JSON.stringify(message));
 
   const wtl = redis.transformKey(`occasion_${entityId}_posts`);
