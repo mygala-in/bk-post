@@ -101,6 +101,15 @@ async function newPost(message) {
 }
 
 
+async function updatePost(message) {
+  const { postId } = message;
+  const obj = _.pick(message, 'url', 'meta', 'text', 'status');
+  logger.info('creating new post ', JSON.stringify(message));
+  await rdsPosts.updatePost(postId, obj);
+  logger.info('completed updating post');
+}
+
+
 async function deletePost(message) {
   const { postId, parentId } = message;
   let { userIds } = message;
@@ -452,6 +461,7 @@ async function sns(request) {
       case 'post':
         switch (action) {
           case 'add': return newPost(data);
+          case 'update': return updatePost(data);
           case 'delete': return deletePost(data);
           default:
         }
