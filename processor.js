@@ -142,7 +142,7 @@ async function deletePost(message) {
 async function generateUserTimeline(userId) {
   logger.info('started generating timeline for user ', userId);
   const mJoins = await rdsOUsers.getOccasions(userId);
-  const vIds = mJoins.items.filter((i) => i.status === OCCASION_CONFIG.status.verified).map((i) => `${i.type}_${i.occasionId}`);
+  const vIds = mJoins.items.filter((i) => i.status === OCCASION_CONFIG.status.verified).map((i) => `occasion_${i.occasionId}`);
   logger.info('verified occasion ids ', vIds);
 
   const key = redis.transformKey(`user_${userId}_posts`);
@@ -161,7 +161,7 @@ async function generateUserTimeline(userId) {
 
 async function generateOccasionTimeline(occasionId) {
   logger.info('started generating timeline for occasion ', occasionId);
-  const postIds = await rdsPosts.getParentPostIds([occasionId]);
+  const postIds = await rdsPosts.getParentPostIds([`occasion_${occasionId}`]);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   const key = redis.transformKey(`occasion_${occasionId}_posts`);
@@ -184,7 +184,7 @@ async function userJoined(message) {
     logger.info('user timeline does not exist, skipping action');
     return;
   }
-  const postIds = await rdsPosts.getParentPostIds([occasionId]);
+  const postIds = await rdsPosts.getParentPostIds([`occasion_${occasionId}`]);
   logger.info('total posts ', postIds.count);
   const tasks = [];
   for (let i = 0; i < postIds.count; i += 1) {
@@ -204,7 +204,7 @@ async function userExited(message) {
   let exists = await redis.exists(key);
   if (!exists) logger.info('user timeline does not exist, skipping action');
   else {
-    const postIds = await rdsPosts.getParentPostIds([occasionId]);
+    const postIds = await rdsPosts.getParentPostIds([`occasion_${occasionId}`]);
     logger.info('total occasion posts ', postIds.count);
     await redis.zrem(key, postIds.items);
     logger.info('completed removing occasion posts from user timeline');
