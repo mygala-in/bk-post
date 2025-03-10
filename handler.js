@@ -253,6 +253,13 @@ async function newPost(request) {
     default: errors.handleError(400, `unhandled post type ${body.type}`);
   }
   const { insertId } = await rdsPosts.insertPost({ userId: decoded.id, ...body });
+
+  logger.info('adding post to occasion timeline ', insertId);
+  const wtl = redis.transformKey(`occasion_${insertId}_posts`);
+  if (await redis.exists(wtl)) {
+    await redis.zadd(wtl, insertId, insertId);
+  } else logger.info('skipping occasion timeline update for ', wtl);
+
   return rdsPosts.getPost(insertId);
 }
 
