@@ -257,7 +257,7 @@ async function newPost(request) {
   logger.info('adding post to occasion timeline ', entityId);
   const wtl = redis.transformKey(`occasion_${entityId}_posts`);
   if (await redis.exists(wtl)) {
-    await redis.zadd(wtl, entityId, entityId);
+    await redis.zadd(wtl, insertId, insertId);
   } else logger.info('skipping occasion timeline update for ', wtl);
 
   return rdsPosts.getPost(insertId);
