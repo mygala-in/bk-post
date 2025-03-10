@@ -235,12 +235,12 @@ async function getOccasionPosts(request) {
 
 async function newPost(request) {
   const { decoded, body } = request;
+  const { entityId, resource } = common.getEntityResource(body.parentId);
   let muObj;
 
   switch (body.type) {
     case 'image':
       if (body.parentId) {
-        const { entityId, resource } = common.getEntityResource(body.parentId);
         if (resource === 'occasion') {
           muObj = await rdsOUsers.getUser(entityId, decoded.id);
           logger.info('requested user ', muObj);
@@ -254,10 +254,10 @@ async function newPost(request) {
   }
   const { insertId } = await rdsPosts.insertPost({ userId: decoded.id, ...body });
 
-  logger.info('adding post to occasion timeline ', insertId);
-  const wtl = redis.transformKey(`occasion_${insertId}_posts`);
+  logger.info('adding post to occasion timeline ', entityId);
+  const wtl = redis.transformKey(`occasion_${entityId}_posts`);
   if (await redis.exists(wtl)) {
-    await redis.zadd(wtl, insertId, insertId);
+    await redis.zadd(wtl, entityId, entityId);
   } else logger.info('skipping occasion timeline update for ', wtl);
 
   return rdsPosts.getPost(insertId);
