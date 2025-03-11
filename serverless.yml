@@ -1,5 +1,5 @@
-service: mygala-bk-timeline
-frameworkVersion: '3.39'
+service: mygala-bk-post
+frameworkVersion: '3.40'
 configValidationMode: error
 
 plugins:
@@ -20,7 +20,7 @@ custom:
   customDomain:
     # Ex: serverless create_domain --stage dev
     domainName: ${self:custom.domains.${self:provider.stage}}
-    basePath: 'timeline' # indication of backend service
+    basePath: 'post' # indication of backend service
     stage: ${self:provider.stage}
     createRoute53Record: false
   vpc:
@@ -59,22 +59,22 @@ provider:
 
 
 functions:
-  timeline-bg-tasks:
+  post-bg-tasks:
     timeout: 60
-    name: ${self:custom.config.envPrefix}-timeline-bg-tasks
+    name: ${self:custom.config.envPrefix}-post-bg-tasks
     handler: processor.sns
     events:
-      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-timeline-bg-tasks
-  timeline-apis:
-    name: ${self:custom.config.envPrefix}-timeline-apis
-    handler: timelineHandler.invoke
+      - sns: arn:aws:sns:${self:custom.config.awsRegion}:${self:custom.config.awsAccountId}:${self:custom.config.envPrefix}-post-bg-tasks
+  post-apis:
+    name: ${self:custom.config.envPrefix}-post-apis
+    handler: handler.invoke
     events:
       - http:
           path: /v1/list
           method: any
           cors: ${self:custom.customCors}
       - http:
-          path: /v1/wedding/{weddingId}/list
+          path: /v1/occasion/{occasionId}/list
           method: get
           cors: ${self:custom.customCors}
       - http:
@@ -108,7 +108,7 @@ resources:
     isProd: {"Fn::Equals" : ["${self:provider.stage}", "prod"]}
     isDev: {"Fn::Equals" : ["${self:provider.stage}", "dev"]}
   Resources:
-    TimelineBgTasksSNS:
+    PostBgTasksSNS:
       Type: AWS::SNS::Topic
       Properties:
-        TopicName: ${self:custom.config.envPrefix}-timeline-bg-tasks
+        TopicName: ${self:custom.config.envPrefix}-post-bg-tasks

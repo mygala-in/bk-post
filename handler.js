@@ -3,6 +3,7 @@ const processor = require('./processor');
 const logger = require('./bk-utils/logger');
 const errors = require('./bk-utils/errors');
 const access = require('./bk-utils/access');
+const common = require('./bk-utils/common');
 const redis = require('./bk-utils/redis.helper');
 const constants = require('./bk-utils/constants');
 const snsHelper = require('./bk-utils/sns.helper');
@@ -11,10 +12,10 @@ const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
 const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
 const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
 const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsWeddings = require('./bk-utils/rds/rds.weddings.helper');
-const rdsWUsers = require('./bk-utils/rds/rds.wedding.users.helper');
+const rdsOccasions = require('./bk-utils/rds/rds.occasions.helper');
+const rdsOUsers = require('./bk-utils/rds/rds.occasion.users.helper');
 
-const { WEDDING_CONFIG, MINI_PROFILE_FIELDS } = constants;
+const { OCCASION_CONFIG, MINI_PROFILE_FIELDS } = constants;
 
 
 /*
@@ -82,7 +83,7 @@ async function getRecentComments(parentIds) {
     logger.info('recent comment ids', JSON.stringify(commentIds));
     if (commentIds.length === 0) return resp;
 
-    resp.items = await redis.mget(commentIds.map((k) => `{comment}_${k}`), 'json');
+    resp.items = await redis.mget(commentIds.map((k) => redis.transformKey(`comment_${k}`)), 'json');
     resp.items = resp.items.filter((k) => k !== null);
     resp.count = resp.items.length;
     logger.info('final recent comments ', JSON.stringify(resp));
@@ -94,7 +95,7 @@ async function getRecentComments(parentIds) {
 
 async function postsAfter(key, postId, size) {
   const total = await redis.zcard(key);
-  logger.info('total timeline items ', total);
+  logger.info('total post items ', total);
   let rank = await redis.zrank(key, postId);
   if (rank == null) rank = 0;
   else rank += 1;
@@ -107,7 +108,7 @@ async function postsAfter(key, postId, size) {
 
 async function postsBefore(key, postId, size) {
   const total = await redis.zcard(key);
-  logger.info('total timeline items ', total);
+  logger.info('total post items ', total);
   let rank = await redis.zrevrank(key, postId);
   if (rank == null) rank = 0;
   else rank += 1;
@@ -120,14 +121,14 @@ async function postsBefore(key, postId, size) {
 
 async function recentPosts(key, size) {
   const total = await redis.zcard(key);
-  logger.info('total timeline items ', total);
+  logger.info('total post items ', total);
   const [st, end] = [0, size - 1];
   const ids = await redis.zrevrange(key, 'int', st, end);
   return { ids, total };
 }
 
 
-async function timelinePosts(action, key, postId, size) {
+async function getPostIds(action, key, postId, size) {
   switch (action) {
     case 'recent':
       return recentPosts(key, size);
@@ -141,38 +142,39 @@ async function timelinePosts(action, key, postId, size) {
 }
 
 
-async function getTimeline(request) {
+async function getUserPosts(request) {
   const { decoded } = request;
   const { action } = request.queryStringParameters;
   let { postId, size } = request.queryStringParameters;
   postId = parseInt(postId, 10);
   size = parseInt(size, 10);
-  const key = redis.transformKey(`user_${decoded.id}_timeline`);
+  const key = redis.transformKey(`user_${decoded.id}_posts`);
   const exists = await redis.exists(key);
   if (!exists) await processor.generateUserTimeline(decoded.id);
 
-  const { ids, total } = await timelinePosts(action, key, postId, size);
-  logger.info('paginated timeline items ', ids);
+  const { ids, total } = await getPostIds(action, key, postId, size);
+  logger.info('paginated post items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const parentIds = ids.map((i) => `post_${i}`);
-
   const [resp, assets, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsPosts.getPostsIn(ids), rdsAssets.getParentAssetsIn(parentIds),
     rdsLikes.likesCountsIn(parentIds), rdsComments.commentsCountsIn(parentIds),
     getRecentLikes(parentIds, decoded.id), getRecentComments(parentIds),
   ]);
   logger.info('total assets ', assets.count);
-  const mIds = _.uniq(_.filter(resp.items.map((r) => r.weddingId), (id) => _.isNumber(id)));
-  logger.info('wedding ids ', mIds);
+  const oIds = _.uniq(_.filter(resp.items.map((r) => r.parentId), (id) => _.contains(id, 'occasion')));
+  logger.info('occasion ids ', oIds);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const [users, weddings] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS), rdsWeddings.getWeddingsIn(mIds)]);
+  const [users, occasions] = await Promise.all([rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS), rdsOccasions.getOccasionsIn(oIds)]);
 
   for (let i = 0; i < resp.count; i += 1) {
     const post = resp.items[i];
     if (post.userId) [post.user] = users.items.filter((u) => u.id === post.userId);
-    if (post.weddingId) [post.wedding] = weddings.items.filter((u) => u.id === post.weddingId);
+    if (post.parentId && _.contains(post.parentId, 'occasion')) {
+      [post.occasion] = occasions.items.filter((u) => `occasion_${u.id}` === post.parentId);
+    }
     const pLikes = recentLikes.items.filter((k) => k.parentId === `post_${post.id}`);
     post.likes = { type: 'collection', total: totalLikes[i] || 0, items: pLikes, count: pLikes.length };
     const pComments = recentComments.items.filter((k) => k.parentId === `post_${post.id}`);
@@ -186,23 +188,23 @@ async function getTimeline(request) {
 }
 
 
-async function getWeddingTimeline(request) {
+async function getOccasionPosts(request) {
   const { decoded } = request;
-  const { weddingId } = request.pathParameters;
+  const { occasionId } = request.pathParameters;
   const { action } = request.queryStringParameters;
   let { postId, size } = request.queryStringParameters;
   postId = parseInt(postId, 10);
   size = parseInt(size, 10);
 
-  const muObj = await rdsWUsers.getUser(weddingId, decoded.id);
+  const muObj = await rdsOUsers.getUser(occasionId, decoded.id);
   logger.info('requested user ', muObj);
-  if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
+  if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
 
-  const key = redis.transformKey(`wedding_${weddingId}_timeline`);
-  if (!await redis.exists(key)) await processor.generateWeddingTimeline(weddingId);
+  const key = redis.transformKey(`occasion_${occasionId}_posts`);
+  if (!await redis.exists(key)) await processor.generateOccasionTimeline(occasionId);
 
-  const { ids, total } = await timelinePosts(action, key, postId, size);
-  logger.info('paginated timeline items ', ids);
+  const { ids, total } = await getPostIds(action, key, postId, size);
+  logger.info('paginated post items ', ids);
   if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
 
   const parentIds = ids.map((i) => `post_${i}`);
@@ -231,22 +233,33 @@ async function getWeddingTimeline(request) {
   return resp;
 }
 
-
 async function newPost(request) {
   const { decoded, body } = request;
+  const { entityId, resource } = common.getEntityResource(body.parentId);
   let muObj;
+
   switch (body.type) {
-    case 'wedding.post':
-      if (!body.weddingId) errors.handleError(400, 'weddingId is required');
-      muObj = await rdsWUsers.getUser(body.weddingId, decoded.id);
-      logger.info('requested user ', muObj);
-      if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
-      if (muObj.status !== WEDDING_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+    case 'image':
+      if (body.parentId) {
+        if (resource === 'occasion') {
+          muObj = await rdsOUsers.getUser(entityId, decoded.id);
+          logger.info('requested user ', muObj);
+          if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
+          if (muObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+        }
+      } else errors.handleError(400, 'parent is required');
       break;
 
     default: errors.handleError(400, `unhandled post type ${body.type}`);
   }
   const { insertId } = await rdsPosts.insertPost({ userId: decoded.id, ...body });
+
+  logger.info('adding post to occasion timeline ', entityId);
+  const wtl = redis.transformKey(`occasion_${entityId}_posts`);
+  if (await redis.exists(wtl)) {
+    await redis.zadd(wtl, insertId, insertId);
+  } else logger.info('skipping occasion timeline update for ', wtl);
+
   return rdsPosts.getPost(insertId);
 }
 
@@ -268,7 +281,7 @@ async function deletePost(request) {
   const post = await rdsPosts.getPost(id);
   if (_.isEmpty(post)) errors.handleError(404, 'post not found');
   if (post.userId !== decoded.id) errors.handleError(401, 'unauthorized');
-  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'post', action: 'delete', data: { postId: id, weddingId: post.weddingId } })]);
+  await Promise.all([rdsPosts.deletePost(id), snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'post', action: 'delete', data: { postId: id, parentId: post.parentId } })]);
   return { success: true };
 }
 
@@ -277,27 +290,29 @@ async function getPost(request) {
   const { id } = request.pathParameters;
   const resp = await rdsPosts.getPost(id);
   if (_.isEmpty(resp)) errors.handleError(404, 'post not found');
-  const { userId, weddingId } = resp;
-  if (weddingId) {
-    const muObj = await rdsWUsers.getUser(weddingId, decoded.id);
+  const { userId, parentId } = resp;
+  const { entityId } = common.getEntityResource(parentId);
+
+  if (entityId) {
+    const muObj = await rdsOUsers.getUser(entityId, decoded.id);
     logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested wedding');
-    if (muObj.status !== WEDDING_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
+    if (muObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
   }
   const tasks = [];
   tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
   tasks.push(rdsAssets.getParentAssets(`post_${id}`));
-  tasks.push(rdsLikes.likesCountsIn([id], 'post'));
-  tasks.push(rdsComments.commentsCountsIn([id], 'post'));
+  tasks.push(rdsLikes.likesCountsIn([`post_${id}`]));
+  tasks.push(rdsComments.commentsCountsIn([`post_${id}`]));
   tasks.push(getRecentLikes([`post_${id}`], decoded.id));
   tasks.push(getRecentComments([`post_${id}`]));
-  if (weddingId) tasks.push(rdsWeddings.getWedding(weddingId));
-  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, wedding] = await Promise.all(tasks);
+  if (entityId) tasks.push(rdsOccasions.getOccasion(entityId));
+  const [user, assets, totalLikes, totalComments, recentLikes, recentComments, occasion] = await Promise.all(tasks);
   resp.user = user;
   resp.assets = assets;
   resp.likes = { type: 'collection', total: totalLikes[0], items: recentLikes.items, count: recentLikes.items.length };
   resp.comments = { type: 'collection', total: totalComments[0], items: recentComments.items, count: recentComments.items.length };
-  if (wedding) resp.wedding = wedding;
+  if (occasion) resp.occasion = occasion;
   return resp;
 }
 
@@ -308,7 +323,7 @@ async function likeAction(request) {
   const { insertId } = await rdsLikes.saveLike({ parentId, userId: decoded.id, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsLikes.getLike(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'add', data: resp });
+  await snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'like', action: 'add', data: resp });
   resp.user = user;
   return resp;
 }
@@ -324,7 +339,7 @@ async function unlikeAction(request) {
 
   await Promise.all([
     rdsLikes.deleteLike(id),
-    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'like', action: 'delete', data: like }),
+    snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'like', action: 'delete', data: like }),
   ]);
   return { success: true };
 }
@@ -336,7 +351,7 @@ async function newComment(request) {
   const { insertId } = await rdsComments.saveComment({ parentId, userId: decoded.id, text: body.text, isDeleted: false });
 
   const [resp, user] = await Promise.all([rdsComments.getComment(insertId), rdsUsers.getUserFields(decoded.id, MINI_PROFILE_FIELDS)]);
-  await snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'add', data: resp });
+  await snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'comment', action: 'add', data: resp });
   resp.user = user;
   return resp;
 }
@@ -352,7 +367,7 @@ async function deleteComment(request) {
 
   await Promise.all([
     rdsComments.deleteComment(id),
-    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'delete', data: comment }),
+    snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'comment', action: 'delete', data: comment }),
   ]);
   return { success: true };
 }
@@ -368,7 +383,7 @@ async function editComment(request) {
 
   await Promise.all([
     rdsComments.updateComment(id, { ...body }),
-    snsHelper.pushToSNS('timeline-bg-tasks', { service: 'timeline', component: 'comment', action: 'edit', data: comment }),
+    snsHelper.pushToSNS('post-bg-tasks', { service: 'post', component: 'comment', action: 'edit', data: comment }),
   ]);
   Object.assign(comment, body);
   return comment;
@@ -386,11 +401,11 @@ async function getComments(request) {
   resp.page = parseInt(page, 10);
   const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
   logger.info('user ids ', uIds);
-  const commentIds = resp.items.map((r) => `comment_${r.id}`);
+  const commentIds = resp.items.map((r) => redis.transformKey(`comment_${r.id}`));
   const [users, totalLikes, totalComments, recentLikes, recentComments] = await Promise.all([
     rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS),
-    rdsLikes.likesCountsIn(commentIds, 'comment'), rdsComments.commentsCountsIn(commentIds, 'comment'), getRecentLikes(commentIds, decoded.id),
-    getRecentComments(commentIds.map((c) => `comment_${c}`)),
+    rdsLikes.likesCountsIn(commentIds), rdsComments.commentsCountsIn(commentIds), getRecentLikes(commentIds, decoded.id),
+    getRecentComments(commentIds.map((c) => redis.transformKey(`comment_${c}`))),
   ]);
   for (let i = 0; i < resp.count; i += 1) {
     const comment = resp.items[i];
@@ -435,16 +450,16 @@ async function invoke(event, context, callback) {
 
     let resp = {};
     switch (request.resourcePath) {
-      case '/v1/list':
-        resp = await getTimeline(request);
-        break;
-
-      case '/v1/wedding/{weddingId}/list':
-        resp = await getWeddingTimeline(request);
-        break;
-
       case '/v1/new':
         resp = await newPost(request);
+        break;
+
+      case '/v1/list':
+        resp = await getUserPosts(request);
+        break;
+
+      case '/v1/occasion/{occasionId}/list':
+        resp = await getOccasionPosts(request);
         break;
 
       case '/v1/{id}':
