@@ -190,11 +190,14 @@ async function getUserPosts(request) {
 
 async function getOccasionPosts(request) {
   const { decoded } = request;
-  const { occasionId } = request.pathParameters;
+  const { parentId } = request.pathParameters;
   const { action } = request.queryStringParameters;
   let { postId, size } = request.queryStringParameters;
   postId = parseInt(postId, 10);
   size = parseInt(size, 10);
+  const [resource, ...entityIdx] = parentId.split('_');
+  console.log('posts parentId resource:', resource);
+  const occasionId = entityIdx.join('_');
 
   const muObj = await rdsOUsers.getUser(occasionId, decoded.id);
   logger.info('requested user ', muObj);
@@ -458,7 +461,7 @@ async function invoke(event, context, callback) {
         resp = await getUserPosts(request);
         break;
 
-      case '/v1/occasion/{occasionId}/list':
+      case '/v1/{parentId}/list':
         resp = await getOccasionPosts(request);
         break;
 
