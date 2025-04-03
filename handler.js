@@ -196,7 +196,7 @@ async function getOccasionPosts(request) {
   postId = parseInt(postId, 10);
   size = parseInt(size, 10);
   const [resource, ...entityIdx] = parentId.split('_');
-  console.log('posts parentId resource:', resource);
+  logger.info('posts parentId resource:', resource);
   const occasionId = entityIdx.join('_');
 
   const muObj = await rdsOUsers.getUser(occasionId, decoded.id);
