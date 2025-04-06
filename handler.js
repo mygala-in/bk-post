@@ -190,12 +190,12 @@ async function getUserPosts(request) {
 
 async function getOccasionPosts(request) {
   const { decoded } = request;
-  const { parentId } = request.pathParameters;
+  const { id } = request.pathParameters;
   const { action } = request.queryStringParameters;
   let { postId, size } = request.queryStringParameters;
   postId = parseInt(postId, 10);
   size = parseInt(size, 10);
-  const [resource, ...entityIdx] = parentId.split('_');
+  const [resource, ...entityIdx] = id.split('_');
   logger.info('posts parentId resource:', resource);
   const occasionId = entityIdx.join('_');
 
@@ -217,7 +217,7 @@ async function getOccasionPosts(request) {
     getRecentLikes(parentIds, decoded.id), getRecentComments(parentIds),
   ]);
   logger.info('total assets ', assets.count);
-  const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (id) => _.isNumber(id)));
+  const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (userId) => _.isNumber(userId)));
   logger.info('user ids ', uIds);
   const users = await rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS);
 
