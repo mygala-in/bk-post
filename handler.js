@@ -461,7 +461,7 @@ async function invoke(event, context, callback) {
         resp = await getUserPosts(request);
         break;
 
-      case '/v1/{parentId}/list':
+      case '/v1/{id}/list':
         resp = await getOccasionPosts(request);
         break;
 
