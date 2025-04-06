@@ -197,14 +197,12 @@ async function getOccasionPosts(request) {
   size = parseInt(size, 10);
   const [resource, ...entityIdx] = id.split('_');
   logger.info('posts parentId resource:', resource);
-  const occasionId = entityIdx.join('_');
-
-  const muObj = await rdsOUsers.getUser(occasionId, decoded.id);
-  logger.info('requested user ', muObj);
-  if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
-
-  const key = redis.transformKey(`occasion_${occasionId}_posts`);
-  if (!await redis.exists(key)) await processor.generateOccasionTimeline(occasionId);
+  const entityId = entityIdx.join('_');
+  const ouObj = await rdsOUsers.getUser(entityId, decoded.id);
+  logger.info('requested user ', ouObj);
+  if (_.isEmpty(ouObj)) errors.handleError(404, 'no association with requested occasion');
+  const key = redis.transformKey(`occasion_${entityId}_posts`);
+  if (!await redis.exists(key)) await processor.generateOccasionTimeline(entityId);
 
   const { ids, total } = await getPostIds(action, key, postId, size);
   logger.info('paginated post items ', ids);
@@ -239,16 +237,16 @@ async function getOccasionPosts(request) {
 async function newPost(request) {
   const { decoded, body } = request;
   const { entityId, resource } = common.getEntityResource(body.parentId);
-  let muObj;
+  let ouObj;
 
   switch (body.type) {
     case 'image':
       if (body.parentId) {
         if (resource === 'occasion') {
-          muObj = await rdsOUsers.getUser(entityId, decoded.id);
-          logger.info('requested user ', muObj);
-          if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
-          if (muObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+          ouObj = await rdsOUsers.getUser(entityId, decoded.id);
+          logger.info('requested user ', ouObj);
+          if (_.isEmpty(ouObj)) errors.handleError(404, 'no association with requested occasion');
+          if (ouObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
         }
       } else errors.handleError(400, 'parent is required');
       break;
@@ -297,10 +295,10 @@ async function getPost(request) {
   const { entityId } = common.getEntityResource(parentId);
 
   if (entityId) {
-    const muObj = await rdsOUsers.getUser(entityId, decoded.id);
-    logger.info('requested user ', muObj);
-    if (_.isEmpty(muObj)) errors.handleError(404, 'no association with requested occasion');
-    if (muObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
+    const ouObj = await rdsOUsers.getUser(entityId, decoded.id);
+    logger.info('requested user ', ouObj);
+    if (_.isEmpty(ouObj)) errors.handleError(404, 'no association with requested occasion');
+    if (ouObj.status !== OCCASION_CONFIG.status.verified) errors.handleError(401, 'unauthorized');
   }
   const tasks = [];
   tasks.push(rdsUsers.getUserFields(userId, MINI_PROFILE_FIELDS));
