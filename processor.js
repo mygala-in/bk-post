@@ -220,7 +220,7 @@ async function userExited(message) {
   }
 
   logger.info('started removing user posts from all occasion users');
-  const postIds = await rdsPosts.getParentUserPostIds(occasionId, userId);
+  const postIds = await rdsPosts.getParentUserPostIds(`occasion_${occasionId}`, userId);
   logger.info('total user posts ', postIds.count);
   await rdsPosts.deletePosts(postIds.items);
 
