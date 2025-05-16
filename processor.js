@@ -94,7 +94,7 @@ async function newPost(message) {
       title,
       topic: common.getTopicName('occasion', entityId),
       groupId: APP_NOTIFICATIONS.channels.profile,
-      payload: { screen: `/posts/${insertId}`, params: { useCache: 'false' } },
+      payload: { screen: `/app/posts/${insertId}`, params: { useCache: 'false' } },
     },
   });
   logger.info('completed adding post to user & occasion timelines');
@@ -287,7 +287,7 @@ async function newLike(message) {
           title: `${user.username ?? user.name} liked your post.`,
           topic,
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: `/posts/${entityId}`, params: { useCache: 'false' } },
+          payload: { screen: `/app/posts/${entityId}`, params: { useCache: 'false' } },
         },
       });
       break;
@@ -303,7 +303,7 @@ async function newLike(message) {
           title: `${user.username ?? user.name} liked your comment.`,
           topic,
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: `/posts/${entityId}`, params: { useCache: 'false' } },
+          payload: { screen: `/app/posts/${entityId}`, params: { useCache: 'false' } },
         },
       });
       break;
@@ -372,7 +372,7 @@ async function newComment(message) {
           title: `${user.username ?? user.name} commented on your post.`,
           topic: common.getTopicName('user', post.userId),
           groupId: APP_NOTIFICATIONS.channels.post,
-          payload: { screen: `/posts/${entityId}`, params: { useCache: 'false' } },
+          payload: { screen: `/app/posts/${entityId}`, params: { useCache: 'false' } },
         },
       });
       break;
