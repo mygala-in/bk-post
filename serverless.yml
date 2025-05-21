@@ -42,6 +42,7 @@ custom:
       - X-Api-Key
       - X-Amz-Security-Token
       - X-Amz-User-Agent
+      - X-Firebase-AppCheck
     allowCredentials: false
 
 provider:
