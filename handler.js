@@ -503,7 +503,7 @@ async function invoke(event, context, callback) {
         resp = await getOccasionPosts(request);
         break;
 
-      case '/v1/{id}/recents':
+      case '/v1/{id}/recent/list':
         resp = await getOccasionRecentPosts(request);
         break;
 

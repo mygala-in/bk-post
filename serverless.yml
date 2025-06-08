@@ -72,7 +72,7 @@ functions:
     events:
       - http:
           path: /v1/list
-          method: any
+          method: get
           cors: ${self:custom.customCors}
       - http:
           path: /v1/{id}/list
@@ -103,7 +103,7 @@ functions:
           method: get
           cors: ${self:custom.customCors}
       - http:
-          path: /v1/{id}/recents
+          path: /v1/{id}/recent/list
           method: get
           cors: ${self:custom.customCors}
 
