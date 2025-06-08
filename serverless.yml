@@ -102,6 +102,10 @@ functions:
           path: /v1/{id}/comments
           method: get
           cors: ${self:custom.customCors}
+      - http:
+          path: /v1/{id}/recents
+          method: get
+          cors: ${self:custom.customCors}
 
 
 resources:
