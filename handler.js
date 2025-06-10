@@ -234,6 +234,38 @@ async function getOccasionPosts(request) {
   return resp;
 }
 
+async function getOccasionRecentPosts(request) {
+  const { id } = request.pathParameters;
+  const action = 'recent';
+  const size = 15;
+  const postId = null;
+  const key = redis.transformKey(`occasion_${id}_posts`);
+  if (!await redis.exists(key)) await processor.generateOccasionTimeline(id);
+
+  const { ids, total } = await getPostIds(action, key, postId, size);
+  logger.info('paginated post items ', ids);
+  if (total === 0 || ids.length === 0) return { entity: 'collection', items: [], count: 0, total };
+
+  const parentIds = ids.map((i) => `post_${i}`);
+  const [resp, assets] = await Promise.all([
+    rdsPosts.getPostsIn(ids), rdsAssets.getParentAssetsIn(parentIds),
+  ]);
+  logger.info('total assets ', assets.count);
+  const uIds = _.uniq(_.filter(resp.items.map((r) => r.userId), (userId) => _.isNumber(userId)));
+  logger.info('user ids ', uIds);
+  const users = await rdsUsers.getUserFieldsIn(uIds, MINI_PROFILE_FIELDS);
+
+  for (let i = 0; i < resp.count; i += 1) {
+    const post = resp.items[i];
+    if (post.userId) [post.user] = users.items.filter((u) => u.id === post.userId);
+    const pAssets = assets.items.filter((k) => k.parentId === `post_${post.id}`);
+    post.assets = { type: 'collection', total: pAssets.length, items: pAssets, count: pAssets.length };
+    resp.items[i] = post;
+  }
+  resp.total = total;
+  return resp;
+}
+
 async function newPost(request) {
   const { decoded, body } = request;
   const { entityId, resource } = common.getEntityResource(body.parentId);
@@ -461,6 +493,10 @@ async function invoke(event, context, callback) {
 
       case '/v1/{id}/list':
         resp = await getOccasionPosts(request);
+        break;
+
+      case '/v1/{id}/recent/list':
+        resp = await getOccasionRecentPosts(request);
         break;
 
       case '/v1/{id}':
