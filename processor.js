@@ -63,15 +63,7 @@ async function newPost(message) {
   } else logger.info('skipping occasion timeline update for ', wtl);
 
   logger.info('adding post to user timelines ', insertId, JSON.stringify(message));
-  const [mUsers, user, post] = await Promise.all([rdsOUsers.getUsers(entityId), rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(insertId)]);
-  const ids = mUsers.items.map((u) => u.userId);
-  logger.info('total occasion users ', ids.length);
-  for (let i = 0; i < ids.length; i += 1) {
-    const utl = redis.transformKey(`user_${ids[i]}_posts`);
-    if (await redis.exists(utl)) {
-      await redis.zadd(utl, insertId, insertId);
-    } else logger.info('skipping user timeline update for ', utl);
-  }
+  const [user, post] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(insertId)]);
   let title = '';
   logger.info(`post type :: ${post.type}`);
   switch (post.type) {
@@ -97,7 +89,7 @@ async function newPost(message) {
       payload: { screen: `/app/posts/${insertId}`, params: { useCache: 'false' } },
     },
   });
-  logger.info('completed adding post to user & occasion timelines');
+  logger.info('completed adding post to occasion timelines');
 }
 
 
@@ -112,7 +104,6 @@ async function updatePost(message) {
 
 async function deletePost(message) {
   const { postId, parentId } = message;
-  let { userIds } = message;
 
   logger.info('deleting post ', postId);
   const key = redis.transformKey(`post_${postId}`);
@@ -123,48 +114,12 @@ async function deletePost(message) {
   ]);
 
   const { entityId } = common.getEntityResource(parentId);
-  logger.info('removing post from user & occasion timelines ', postId, JSON.stringify(message));
+  logger.info('removing post from occasion timelines ', postId, JSON.stringify(message));
 
   const wtl = redis.transformKey(`occasion_${entityId}_posts`);
   if (await redis.exists(wtl)) {
     await redis.zrem(wtl, postId);
   }
-
-  if (userIds) {
-    logger.info('using users from request ', userIds.length);
-  } else {
-    const mUsers = await rdsOUsers.getUsers(entityId);
-    userIds = mUsers.items.map((user) => user.userId);
-    logger.info('total occasion users ', userIds.length);
-  }
-
-  for (let i = 0; i < userIds.length; i += 1) {
-    const utl = redis.transformKey(`user_${userIds[i]}_posts`);
-    if (await redis.exists(utl)) {
-      await redis.zrem(utl, postId);
-    } else logger.info('skipping timeline update for ', utl);
-  }
-  logger.info('completed removing post from user timelines');
-}
-
-
-async function generateUserTimeline(userId) {
-  logger.info('started generating timeline for user ', userId);
-  const mJoins = await rdsOUsers.getOccasions(userId);
-  const vIds = mJoins.items.filter((i) => i.status === OCCASION_CONFIG.status.verified).map((i) => `occasion_${i.occasionId}`);
-  logger.info('verified occasion ids ', vIds);
-
-  const key = redis.transformKey(`user_${userId}_posts`);
-  const postIds = await rdsPosts.getParentPostIds(vIds);
-  logger.info('total posts ', postIds.count);
-  const tasks = [];
-  for (let i = 0; i < postIds.count; i += 1) {
-    const id = postIds.items[i];
-    tasks.push(redis.zadd(key, id, id));
-  }
-  await Promise.all(tasks);
-  await redis.expire(key, REDIS_CONFIG.timeline.user);
-  logger.info('completed generating timeline for user');
 }
 
 
@@ -184,60 +139,15 @@ async function generateOccasionTimeline(occasionId) {
 }
 
 
-async function userJoined(message) {
-  const { userId, occasionId } = message;
-  logger.info('started adding occasion posts to user timeline ', { occasionId, userId });
-  const key = redis.transformKey(`user_${userId}_posts`);
-  const exists = await redis.exists(key);
-  if (!exists) {
-    logger.info('user timeline does not exist, skipping action');
-    return;
-  }
-  const postIds = await rdsPosts.getParentPostIds([`occasion_${occasionId}`]);
-  logger.info('total posts ', postIds.count);
-  const tasks = [];
-  for (let i = 0; i < postIds.count; i += 1) {
-    const id = postIds.items[i];
-    tasks.push(redis.zadd(key, id, id));
-  }
-  await Promise.all(tasks);
-  await redis.expire(key, REDIS_CONFIG.timeline.user);
-  logger.info('completed adding occasion posts to user timeline');
-}
-
-
 async function userExited(message) {
   const { userId, occasionId } = message;
-  logger.info('started removing occasion posts from user timeline ', { occasionId, userId });
-  let key = redis.transformKey(`user_${userId}_posts`);
-  let exists = await redis.exists(key);
-  if (!exists) logger.info('user timeline does not exist, skipping action');
-  else {
-    const postIds = await rdsPosts.getParentPostIds([`occasion_${occasionId}`]);
-    logger.info('total occasion posts ', postIds.count);
-    await redis.zrem(key, postIds.items);
-    logger.info('completed removing occasion posts from user timeline');
-  }
 
   logger.info('started removing user posts from all occasion users');
   const postIds = await rdsPosts.getParentUserPostIds(`occasion_${occasionId}`, userId);
   logger.info('total user posts ', postIds.count);
   await rdsPosts.deletePosts(postIds.items);
-
-  const mUsers = await rdsOUsers.getUsers(occasionId);
-  const userIds = mUsers.items.map((user) => user.userId);
-  logger.info('total occasion users ', userIds.length);
-
-  for (let k = 0; k < userIds.length; k += 1) {
-    key = redis.transformKey(`user_${userIds[k]}_posts`);
-    exists = await redis.exists(key);
-    if (exists) {
-      await redis.zrem(key, postIds.items);
-    } else logger.info('skipping timeline update for ', key);
-  }
   logger.info('completed removing user posts from all occasion users');
 }
-
 
 async function newLike(message) {
   const { id, userId, parentId } = message;
@@ -469,7 +379,6 @@ async function sns(request) {
 
       case 'occasion':
         switch (action) {
-          case 'join': return userJoined(data);
           case 'exit': return userExited(data);
           default:
         }
@@ -487,6 +396,5 @@ async function sns(request) {
 
 module.exports = {
   sns,
-  generateUserTimeline,
   generateOccasionTimeline,
 };
