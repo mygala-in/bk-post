@@ -50,11 +50,11 @@ async function getRootParent(parentId) {
 
 
 async function newPost(message) {
-  const { userId, parentId, type, status } = message;
+  const { userId, parentId, type, status, text, meta } = message;
   const { entityId } = common.getEntityResource(parentId);
 
   logger.info('creating new post ', JSON.stringify(message));
-  const { insertId } = await rdsPosts.insertPost({ userId, parentId, type, status });
+  const { insertId } = await rdsPosts.insertPost({ userId, parentId, type, status, text, meta });
 
   logger.info('adding post to occasion timeline ', insertId);
   const wtl = redis.transformKey(`occasion_${entityId}_posts`);
@@ -72,6 +72,9 @@ async function newPost(message) {
       break;
     case 'join':
       title = `${user.username ?? user.name} joined the occasion.`;
+      break;
+    case 'gift':
+      title = `${user?.username ?? user?.name ?? 'anonymous'} sent gift money.`;
       break;
     default:
   }
