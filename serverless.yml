@@ -71,10 +71,6 @@ functions:
     handler: handler.invoke
     events:
       - http:
-          path: /v1/list
-          method: get
-          cors: ${self:custom.customCors}
-      - http:
           path: /v1/{id}/list
           method: get
           cors: ${self:custom.customCors}
