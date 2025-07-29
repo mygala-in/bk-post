@@ -50,8 +50,21 @@ async function getRootParent(parentId) {
 
 
 async function newPost(message) {
-  const { userId, parentId, type, status, text, meta } = message;
+  const { userId, parentId, type, status, text, meta, contact, email } = message;
   const { entityId } = common.getEntityResource(parentId);
+
+  let user = null;
+  if (userId == null) {
+    logger.warn('userId is null, trying to find user based on contact');
+    const { phone } = common.parsePhone(contact);
+    user = await rdsUsers.getUserByPhone(phone);
+    if (user == null) {
+      logger.warn('user not found by phone, trying to find user based on email');
+      user = await rdsUsers.getUserByEmail(email);
+    }
+  } else {
+    user = await rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS);
+  }
 
   logger.info('creating new post ', JSON.stringify(message));
   const { insertId } = await rdsPosts.insertPost({ userId, parentId, type, status, text, meta });
@@ -62,8 +75,7 @@ async function newPost(message) {
     await redis.zadd(wtl, insertId, insertId);
   } else logger.info('skipping occasion timeline update for ', wtl);
 
-  logger.info('adding post to user timelines ', insertId, JSON.stringify(message));
-  const [user, post] = await Promise.all([rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS), rdsPosts.getPost(insertId)]);
+  const post = await rdsPosts.getPost(insertId);
   let title = '';
   logger.info(`post type :: ${post.type}`);
   switch (post.type) {
