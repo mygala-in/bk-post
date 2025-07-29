@@ -50,7 +50,8 @@ async function getRootParent(parentId) {
 
 
 async function newPost(message) {
-  const { userId, parentId, type, status, text, meta, contact, email } = message;
+  const { parentId, type, status, text, meta, contact, email } = message;
+  let { userId } = message;
   const { entityId } = common.getEntityResource(parentId);
 
   let user = null;
@@ -62,6 +63,7 @@ async function newPost(message) {
       logger.warn('user not found by phone, trying to find user based on email');
       user = await rdsUsers.getUserByEmail(email);
     }
+    userId = user?.id;
   } else {
     user = await rdsUsers.getUserFields(userId, constants.MINI_PROFILE_FIELDS);
   }
