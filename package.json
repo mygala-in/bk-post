@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "manage timeline for wedstage users, weddings, etc.",
   "main": "timelineHandler.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "node_modules/eslint/bin/eslint.js .",
@@ -20,7 +21,7 @@
     "aws-sdk": "^2.925.0",
     "eslint": "^8.57.1",
     "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.32.0",   
+    "eslint-plugin-import": "^2.32.0",  
     "serverless": "^3.12.0",
     "serverless-domain-manager": "^6.0.2",
     "serverless-prune-plugin": "^2.0.1"
