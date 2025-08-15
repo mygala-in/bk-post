@@ -1,18 +1,18 @@
 /* eslint-disable no-await-in-loop */
-const _ = require('underscore');
-const logger = require('./bk-utils/logger');
-const errors = require('./bk-utils/errors');
-const common = require('./bk-utils/common');
-const redis = require('./bk-utils/redis.helper');
-const constants = require('./bk-utils/constants');
-const snsHelper = require('./bk-utils/sns.helper');
-const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
-const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
-const rdsUsers = require('./bk-utils/rds/rds.users.helper');
-const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsOccasions = require('./bk-utils/rds/rds.occasions.helper');
-const rdsOUsers = require('./bk-utils/rds/rds.occasion.users.helper');
-const rdsWEvents = require('./bk-utils/rds/rds.wedding.events.helper');
+import _ from 'underscore';
+import logger from './bk-utils/logger.js';
+import errors from './bk-utils/errors.js';
+import common from './bk-utils/common.js';
+import redis from './bk-utils/redis.helper.js';
+import constants from './bk-utils/constants.js';
+import snsHelper from './bk-utils/sns.helper.js';
+import rdsPosts from './bk-utils/rds/rds.posts.helper.js';
+import rdsLikes from './bk-utils/rds/rds.likes.helper.js';
+import rdsUsers from './bk-utils/rds/rds.users.helper.js';
+import rdsComments from './bk-utils/rds/rds.comments.helper.js';
+import rdsOccasions from './bk-utils/rds/rds.occasions.helper.js';
+import rdsOUsers from './bk-utils/rds/rds.occasion.users.helper.js';
+import rdsOEvents from './bk-utils/rds/rds.occasion.events.helper.js';
 
 const { LIMITS_CONFIG, REDIS_CONFIG, APP_NOTIFICATIONS, OCCASION_CONFIG } = constants;
 
@@ -38,7 +38,7 @@ async function getRootParent(parentId) {
     case 'occasion':
       return rdsOccasions.getOccasion(entityId);
     case 'event':
-      return rdsWEvents.getEventById(entityId);
+      return rdsOEvents.getEventById(entityId);
     case 'comment':
       parent = await rdsComments.getComment(entityId);
       logger.info('sub parent ', parent);
@@ -413,7 +413,7 @@ async function sns(request) {
 }
 
 
-module.exports = {
+export {
   sns,
   generateOccasionTimeline,
 };

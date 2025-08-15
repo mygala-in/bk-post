@@ -1,19 +1,19 @@
-const _ = require('underscore');
-const processor = require('./processor');
-const logger = require('./bk-utils/logger');
-const errors = require('./bk-utils/errors');
-const access = require('./bk-utils/access');
-const common = require('./bk-utils/common');
-const redis = require('./bk-utils/redis.helper');
-const constants = require('./bk-utils/constants');
-const snsHelper = require('./bk-utils/sns.helper');
-const rdsUsers = require('./bk-utils/rds/rds.users.helper');
-const rdsPosts = require('./bk-utils/rds/rds.posts.helper');
-const rdsLikes = require('./bk-utils/rds/rds.likes.helper');
-const rdsAssets = require('./bk-utils/rds/rds.assets.helper');
-const rdsComments = require('./bk-utils/rds/rds.comments.helper');
-const rdsOccasions = require('./bk-utils/rds/rds.occasions.helper');
-const rdsOUsers = require('./bk-utils/rds/rds.occasion.users.helper');
+import _ from 'underscore';
+import * as processor from './processor.js';
+import logger from './bk-utils/logger.js';
+import errors from './bk-utils/errors.js';
+import access from './bk-utils/access.js';
+import common from './bk-utils/common.js';
+import redis from './bk-utils/redis.helper.js';
+import constants from './bk-utils/constants.js';
+import snsHelper from './bk-utils/sns.helper.js';
+import rdsUsers from './bk-utils/rds/rds.users.helper.js';
+import rdsPosts from './bk-utils/rds/rds.posts.helper.js';
+import rdsLikes from './bk-utils/rds/rds.likes.helper.js';
+import rdsAssets from './bk-utils/rds/rds.assets.helper.js';
+import rdsComments from './bk-utils/rds/rds.comments.helper.js';
+import rdsOccasions from './bk-utils/rds/rds.occasions.helper.js';
+import rdsOUsers from './bk-utils/rds/rds.occasion.users.helper.js';
 
 const { OCCASION_CONFIG, MINI_PROFILE_FIELDS } = constants;
 
@@ -499,6 +499,6 @@ async function invoke(event, context, callback) {
   }
 }
 
-module.exports = {
+export {
   invoke,
 };
