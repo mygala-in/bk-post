@@ -1,0 +1,315 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: MyGala Backend Post APIs - SAM Template
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: mygala-bk-post
+    Description: MyGala Backend Post APIs
+  cfn-lint:
+    config:
+      ignore_checks:
+        - W3002
+
+Parameters:
+  stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment stage (dev or prod) from bk-config
+  securityGroup:
+    Type: String
+    Description: Security group ID from bk-config
+  subnet1:
+    Type: String
+    Description: Subnet ID 1 from bk-config
+  subnet2:
+    Type: String
+    Description: Subnet ID 2 from bk-config
+  subnet3:
+    Type: String
+    Description: Subnet ID 3 from bk-config
+  lambdaRole:
+    Type: String
+    Description: Lambda execution role ARN from bk-config
+  jwtSecretKey:
+    Type: String
+    Description: JWT secret key from bk-config
+  awsRegion:
+    Type: String
+    Description: AWS region from bk-config
+  envPrefix:
+    Type: String
+    Description: Environment prefix from bk-config
+  awsAccountId:
+    Type: String
+    Description: AWS account ID from bk-config
+  firebaseApp:
+    Type: String
+    Description: Firebase app name from bk-config
+  rdsDB:
+    Type: String
+    Description: RDS database name from bk-config
+  rdsUser:
+    Type: String
+    Description: RDS database username from bk-config
+  rdsPassword:
+    Type: String
+    Description: RDS database password from bk-config
+  rdsHost:
+    Type: String
+    Description: RDS database host from bk-config
+  youtubeApiKey:
+    Type: String
+    Description: YouTube API key from bk-config
+  geocodingApiKey:
+    Type: String
+    Description: Geocoding API key from bk-config
+  dynamicLinksKey:
+    Type: String
+    Description: Dynamic Links API key from bk-config
+  assetsBucket:
+    Type: String
+    Description: Assets S3 bucket name from bk-config
+  publicAssetsBucket:
+    Type: String
+    Description: Public Assets S3 bucket name from bk-config
+  assetsCloudFront:
+    Type: String
+    Description: Assets CloudFront distribution URL from bk-config
+  iosPackageName:
+    Type: String
+    Description: iOS app package name from bk-config
+  iosAppStoreId:
+    Type: String
+    Description: iOS app store ID from bk-config
+  androidPackageName:
+    Type: String
+    Description: Android app package name from bk-config
+  apiUrl:
+    Type: String
+    Description: API URL from bk-config
+  assetsUrl:
+    Type: String
+    Description: Assets URL from bk-config
+  webUrl:
+    Type: String
+    Description: Web URL from bk-config
+  redisHost:
+    Type: String
+    Description: Redis host from bk-config
+  redisPassword:
+    Type: String
+    Description: Redis password from bk-config
+  redisPort:
+    Type: String
+    Description: Redis port from bk-config
+  spreadSheetId:
+    Type: String
+    Description: Google Spread Sheet ID from bk-config
+  razorpayKeyId:
+    Type: String
+    Description: Razorpay key ID from bk-config
+  razorpayKeySecret:
+    Type: String
+    Description: Razorpay key secret from bk-config
+  rPaySignatureSecret:
+    Type: String
+    Description: RPay signature secret from bk-config
+
+Conditions:
+  IsProd: !Equals [!Ref stage, "prod"]
+
+Mappings:
+  StageConfig:
+    dev:
+      Domain: dev-api.mygala.in
+      DeploymentBucket: dev-mygala-serverless-deployments
+    prod:
+      Domain: api.mygala.in
+      DeploymentBucket: prod-mygala-serverless-deployments
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 12
+    VpcConfig: !If
+      - IsProd
+      - SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+          - !Ref subnet3
+      - !Ref "AWS::NoValue"
+    Environment:
+      Variables:
+        stage: !Sub "${stage}"
+        awsRegion: !Sub "${awsRegion}"
+        envPrefix: !Sub "${envPrefix}"
+        awsAccountId: !Sub "${awsAccountId}"
+        firebaseApp: !Sub "${firebaseApp}"
+        rdsDB: !Sub "${rdsDB}"
+        rdsUser: !Sub "${rdsUser}"
+        rdsPassword: !Sub "${rdsPassword}"
+        rdsHost: !Sub "${rdsHost}"
+        jwtSecretKey: !Sub "${jwtSecretKey}"
+        youtubeApiKey: !Sub "${youtubeApiKey}"
+        geocodingApiKey: !Sub "${geocodingApiKey}"
+        dynamicLinksKey: !Sub "${dynamicLinksKey}"
+        assetsBucket: !Sub "${assetsBucket}"
+        publicAssetsBucket: !Sub "${publicAssetsBucket}"
+        assetsCloudFront: !Sub "${assetsCloudFront}"
+        iosPackageName: !Sub "${iosPackageName}"
+        iosAppStoreId: !Sub "${iosAppStoreId}"
+        androidPackageName: !Sub "${androidPackageName}"
+        apiUrl: !Sub "${apiUrl}"
+        assetsUrl: !Sub "${assetsUrl}"
+        webUrl: !Sub "${webUrl}"
+        redisHost: !Sub "${redisHost}"
+        redisPassword: !Sub "${redisPassword}"
+        redisPort: !Sub "${redisPort}"
+        spreadSheetId: !Sub "${spreadSheetId}"
+        razorpayKeyId: !Sub "${razorpayKeyId}"
+        razorpayKeySecret: !Sub "${razorpayKeySecret}"
+        rPaySignatureSecret: !Sub "${rPaySignatureSecret}"
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+      AllowHeaders: "'platform,appversion,Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Firebase-AppCheck'"
+      AllowOrigin: "'*'"
+      AllowCredentials: false
+    EndpointConfiguration:
+      Type: REGIONAL
+    OpenApiVersion: 3.0.1
+
+Resources:
+  # API Gateway with explicit stage
+  PostApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "mygala-bk-post-${stage}"
+      StageName: !Ref stage
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'platform,appversion,Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Firebase-AppCheck'"
+        AllowOrigin: "'*'"
+        AllowCredentials: false
+      EndpointConfiguration:
+        Type: REGIONAL
+
+  # Post APIs Function  
+  PostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${envPrefix}-post-apis"
+      CodeUri: ./
+      Handler: handler.invoke
+      Role: !Ref lambdaRole
+      Events:
+        # Get user's posts
+        GetUserPosts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/list
+            Method: get
+        # Create new post
+        CreatePost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/new
+            Method: post
+        # Post operations (get, update, delete)
+        PostOperations:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}
+            Method: any
+        # Like operations
+        LikeOperations:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/like
+            Method: any
+        # Comment operations
+        CommentOperations:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/comment
+            Method: any
+        # Get post likes
+        GetPostLikes:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/likes
+            Method: get
+        # Get post comments
+        GetPostComments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/comments
+            Method: get
+        # Get recent posts
+        GetRecentPosts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/recent/list
+            Method: get
+
+  # Post Background Tasks Function
+  PostBgTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${envPrefix}-post-bg-tasks"
+      CodeUri: ./
+      Handler: processor.sns
+      Role: !Ref lambdaRole
+      Timeout: 60
+      Events:
+        SNSEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref PostBgTasksSNS
+
+  # SNS Topic for Background Tasks
+  PostBgTasksSNS:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${envPrefix}-post-bg-tasks"
+
+  # API Mapping for existing custom domain
+  PostApiMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName: !FindInMap [StageConfig, !Ref stage, Domain]
+      RestApiId: !Ref PostApi
+      Stage: !Sub "${stage}"
+      BasePath: post
+
+Outputs:
+  PostApi:
+    Description: "API Gateway endpoint URL for Post service"
+    Value: !Sub "https://${PostApi}.execute-api.${AWS::Region}.amazonaws.com/${stage}/"
+
+  PostBgTasksFunction:
+    Description: "Post Background Tasks Lambda Function ARN"
+    Value: !GetAtt PostBgTasksFunction.Arn
+
+  PostFunction:
+    Description: "Post API Lambda Function ARN"
+    Value: !GetAtt PostFunction.Arn
+
+  PostBgTasksSNS:
+    Description: "Post Background Tasks SNS Topic ARN"
+    Value: !Ref PostBgTasksSNS

@@ -6,10 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "node_modules/eslint/bin/eslint.js .",
-    "lint-fix": "node_modules/eslint/bin/eslint.js . --fix",
-    "dev-deploy": "node_modules/serverless/bin/serverless.js deploy --stage dev",
-    "prod-deploy": "node_modules/serverless/bin/serverless.js deploy --stage prod"
+    "lint": "./bk-utils/node_modules/.bin/eslint --config ./bk-utils/eslint.config.js .",
+    "lint-fix": "./bk-utils/node_modules/.bin/eslint --config ./bk-utils/eslint.config.js . --fix"
   },
   "repository": {
     "type": "git",
@@ -18,13 +16,7 @@
   "author": "ksAvinash",
   "license": "ISC",
   "devDependencies": {
-    "aws-sdk": "^2.925.0",
-    "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.32.0",  
-    "serverless": "^3.12.0",
-    "serverless-domain-manager": "^6.0.2",
-    "serverless-prune-plugin": "^2.0.1"
+    "aws-sdk": "^2.925.0"
   },
   "dependencies": {
     "underscore": "^1.13.2"

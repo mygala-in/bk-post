@@ -4,6 +4,9 @@ jspm_packages
 
 # Serverless directories
 .serverless
+
+# AWS SAM
+.aws-sam/
 package-lock.json
 rpay.html
 

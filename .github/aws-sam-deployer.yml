@@ -1,0 +1,23 @@
+name: AWS SAM Deploy
+
+on:
+  push:
+    branches: [ dev, prod ]
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Deployment stage'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - prod
+
+jobs:
+  deploy:
+    uses: mygala-in/gh-workflows/.github/workflows/sam-deploy.yml@main
+    with:
+      service-name: bk-post
+      stage: ${{ github.event.inputs.stage || (github.ref == 'refs/heads/prod' && 'prod' || 'dev') }}
+    secrets: inherit
