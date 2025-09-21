@@ -291,6 +291,7 @@ Resources:
   # API Mapping for existing custom domain
   PostApiMapping:
     Type: AWS::ApiGateway::BasePathMapping
+    DependsOn: PostApi
     Properties:
       DomainName: !FindInMap [StageConfig, !Ref stage, Domain]
       RestApiId: !Ref PostApi
