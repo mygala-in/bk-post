@@ -291,26 +291,8 @@ Resources:
   # API Mapping for existing custom domain
   PostApiMapping:
     Type: AWS::ApiGateway::BasePathMapping
-    DependsOn: PostApi
     Properties:
       DomainName: !FindInMap [StageConfig, !Ref stage, Domain]
       RestApiId: !Ref PostApi
       Stage: !Sub "${stage}"
       BasePath: post
-
-Outputs:
-  PostApi:
-    Description: "API Gateway endpoint URL for Post service"
-    Value: !Sub "https://${PostApi}.execute-api.${AWS::Region}.amazonaws.com/${stage}/"
-
-  PostBgTasksFunction:
-    Description: "Post Background Tasks Lambda Function ARN"
-    Value: !GetAtt PostBgTasksFunction.Arn
-
-  PostFunction:
-    Description: "Post API Lambda Function ARN"
-    Value: !GetAtt PostFunction.Arn
-
-  PostBgTasksSNS:
-    Description: "Post Background Tasks SNS Topic ARN"
-    Value: !Ref PostBgTasksSNS
