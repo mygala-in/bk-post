@@ -11,21 +11,16 @@ The repository uses two private Git submodules for deployment:
 - `bk-config` - https://github.com/gala-in/bk-config.git
 - `bk-utils` - https://github.com/gala-in/bk-utils.git
 
-**Status:** This is intentional for internal deployment. Example files are provided in `.examples/` directory.
+**Status:** This is intentional for internal deployment.
 
 **Impact for External Users:** 
-- Users without access to private repositories can still understand the structure via examples
-- External users would need to create their own implementations based on the examples
+- Users without access to private repositories would need to create their own implementations
 - The repository can still be made public with this configuration
 
 **For Team Members:**
 ```bash
 git submodule update --init --recursive
 ```
-
-**For External Users:**
-- See `.examples/bk-config/` for configuration templates
-- See `.examples/bk-utils/` for required utility interfaces
 
 ### 2. Configuration Files in Private Submodule ✅ ADDRESSED
 **Severity: LOW**
@@ -36,11 +31,9 @@ config: ${file(./bk-config/configs.${self:provider.stage}.json)}
 environment: ${file(./bk-config/envs.${self:provider.stage}.json)}
 ```
 
-**Status:** Example configuration files provided in `.examples/bk-config/` directory.
+**Status:** Configuration files are managed through the private `bk-config` submodule.
 
 **For Team Members:** Configuration is managed through the private submodule.
-
-**For External Users:** Templates and documentation available in `.examples/bk-config/README.md`
 
 ### 3. AWS-Specific Configuration Exposed
 **Severity: MEDIUM**
@@ -161,17 +154,11 @@ mygala-in/gh-workflows/.github/workflows/serverless-deployer.yml@main
 
 The repository now includes:
 - `.gitmodules` - Configures private submodules for team deployment
-- `.examples/` - Provides templates and interfaces for external users
-- Updated documentation explaining dual setup (internal vs external)
+- Updated documentation explaining submodule setup
 
-**Status:** Repository works for both internal team (with submodules) and external users (with examples)
+**Status:** Repository configured for internal team deployment with submodules
 
-2. **Configuration Examples (COMPLETE)**
-   - ✅ Created `.examples/bk-config/configs.example.json`
-   - ✅ Created `.examples/bk-config/envs.example.json`
-   - ✅ Documented all required environment variables in `.examples/bk-config/README.md`
-
-3. **Update Repository Metadata (COMPLETE)**
+2. **Update Repository Metadata (COMPLETE)**
    - ✅ Fixed package.json name, description, and repository URL
    - ✅ Added LICENSE file
    - ✅ Updated README.md with comprehensive documentation
@@ -197,16 +184,14 @@ The repository now includes:
 
 **Current Status: READY for public release**
 
-The repository has been configured to support both internal deployment (with private submodules) and external understanding (with example files):
+The repository has been configured to support internal deployment with private submodules:
 
 ✅ **Private submodules** - Configured in `.gitmodules` for team deployment
-✅ **Example files** - Provided in `.examples/` for external users  
-✅ **Documentation** - Complete setup instructions for both scenarios
+✅ **Documentation** - Complete setup instructions
 ✅ **Security** - No exposed secrets or sensitive data
 ✅ **Metadata** - Repository information corrected
 
-**Dual Setup Approach:**
+**Setup:**
 - **Internal Team:** Use `git submodule update --init` to get actual config and utilities
-- **External Users:** Reference `.examples/` directory for templates and interfaces
 
-This approach allows the repository to be public while maintaining the deployment workflow that depends on private submodules.
+The repository maintains the deployment workflow that depends on private submodules.

@@ -44,7 +44,7 @@ cd bk-post
 git submodule update --init --recursive
 ```
 
-**Note:** The `bk-config` and `bk-utils` directories are Git submodules pointing to private repositories. If you don't have access, see the `.examples/` directory for templates and interfaces.
+**Note:** The `bk-config` and `bk-utils` directories are Git submodules pointing to private repositories.
 
 3. Install dependencies:
 ```bash
@@ -65,10 +65,6 @@ This repository uses Git submodules for configuration and shared utilities:
 ```bash
 git submodule update --init --recursive
 ```
-
-**For external users:** See the `.examples/` directory for:
-- `.examples/bk-config/` - Configuration file templates and documentation
-- `.examples/bk-utils/` - Required utility interfaces and documentation
 
 ### Required Configuration Files
 
@@ -120,8 +116,6 @@ This service depends on shared utility libraries (`bk-utils` submodule) which pr
 - Common helper functions
 
 **For team members:** The submodule will be initialized with `git submodule update --init`
-
-**For external users:** See `.examples/bk-utils/README.md` for required interfaces and how to implement them.
 
 ## API Endpoints
 
