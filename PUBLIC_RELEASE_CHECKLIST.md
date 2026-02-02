@@ -10,7 +10,8 @@
 - [x] Verified setup works for both internal deployment and external understanding
 
 ### Security Review
-- [x] Removed private Git submodules (bk-config, bk-utils)
+- [x] Configured Git submodules for deployment (bk-config, bk-utils)
+- [x] Created example files in .examples/ for external users
 - [x] Scanned for hardcoded credentials - **NONE FOUND**
 - [x] Scanned for email addresses - **NONE FOUND**
 - [x] Scanned for API keys/tokens - **NONE FOUND**
