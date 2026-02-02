@@ -1,10 +1,12 @@
-# Utility Libraries
+# Utility Libraries (Example)
 
-This directory should contain shared utility libraries used by the post service.
+This directory shows the required interface for the `bk-utils` submodule.
+
+**Note:** The actual `bk-utils` directory is a Git submodule pointing to a private repository. This documentation is provided to help external users understand what utilities are needed.
 
 ## Required Utilities
 
-The service expects the following modules to be available in this directory:
+The service expects the following modules to be available in the `bk-utils` directory:
 
 ### Core Utilities
 - `logger.js` - Logging utility
@@ -27,30 +29,16 @@ The service expects the following modules to be available in this directory:
 - `rds/rds.occasion.users.helper.js` - Occasion user associations
 - `rds/rds.wedding.events.helper.js` - Wedding event data access
 
-## Setup Options
+## For Internal Deployment
 
-### Option 1: Using Git Submodule (Original Setup)
 If you have access to the private `bk-utils` repository:
 ```bash
 git submodule update --init --recursive
 ```
 
-### Option 2: Implement Your Own Utilities
-Create implementations for each required module based on your infrastructure:
+## For External Users
 
-1. Create the directory structure:
-```bash
-mkdir -p bk-utils/rds
-```
-
-2. Implement each module according to the interface used in the code
-
-3. Update `.gitmodules` to remove the submodule reference
-
-### Option 3: Use npm Package
-Refactor to use an npm package with the required utilities.
-
-## Module Interfaces
+You would need to implement these utilities based on your infrastructure. Key interfaces:
 
 ### logger.js
 ```javascript

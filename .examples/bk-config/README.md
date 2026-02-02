@@ -1,8 +1,10 @@
-# Configuration Files
+# Configuration Files (Example)
 
-This directory should contain environment-specific configuration files that are **not** committed to the repository.
+This directory shows example configuration files for the `bk-config` submodule.
 
-## Required Files
+**Note:** The actual `bk-config` directory is a Git submodule pointing to a private repository. These examples are provided to help external users understand the configuration structure.
+
+## Required Files for Deployment
 
 ### 1. `configs.{stage}.json`
 
@@ -40,17 +42,16 @@ Create environment variable files for each deployment stage:
 
 **Note:** Use AWS Systems Manager Parameter Store for sensitive values like passwords.
 
-## Setup
+## For Internal Deployment
 
-1. Copy the example files:
-   ```bash
-   cp configs.example.json configs.dev.json
-   cp envs.example.json envs.dev.json
-   ```
+If you have access to the private `bk-config` repository:
+```bash
+git submodule update --init --recursive
+```
 
-2. Update the values in the new files with your actual configuration
+## For External Users
 
-3. Never commit the actual `configs.*.json` or `envs.*.json` files (they are in `.gitignore`)
+Create your own `bk-config` directory with the files shown above, adapted to your infrastructure.
 
 ## Security Notes
 

@@ -39,18 +39,40 @@ git clone https://github.com/mygala-in/bk-post.git
 cd bk-post
 ```
 
-2. Install dependencies:
+2. Initialize Git submodules (if you have access to private repositories):
+```bash
+git submodule update --init --recursive
+```
+
+**Note:** The `bk-config` and `bk-utils` directories are Git submodules pointing to private repositories. If you don't have access, see the `.examples/` directory for templates and interfaces.
+
+3. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Set up configuration files (see [Configuration](#configuration) section)
+4. Set up configuration files (see [Configuration](#configuration) section)
 
 ## Configuration
 
+### Git Submodules
+
+This repository uses Git submodules for configuration and shared utilities:
+- `bk-config` - Configuration files (private repository)
+- `bk-utils` - Shared utility libraries (private repository)
+
+**For team members with access:**
+```bash
+git submodule update --init --recursive
+```
+
+**For external users:** See the `.examples/` directory for:
+- `.examples/bk-config/` - Configuration file templates and documentation
+- `.examples/bk-utils/` - Required utility interfaces and documentation
+
 ### Required Configuration Files
 
-The service requires configuration files that are not committed to the repository for security reasons.
+The service requires configuration files in the `bk-config` directory.
 
 #### 1. Create AWS Configuration
 
@@ -90,14 +112,16 @@ See `bk-config/README.md` for more details on configuration.
 
 ### Utility Libraries
 
-This service depends on shared utility libraries (`bk-utils`) which need to be set up separately. These utilities provide:
+This service depends on shared utility libraries (`bk-utils` submodule) which provide:
 - Database helpers (RDS)
 - Redis helpers
 - Logger utilities
 - Access control and authentication
 - Common helper functions
 
-**Note:** If you're setting up this project independently, you'll need to implement or provide these utilities.
+**For team members:** The submodule will be initialized with `git submodule update --init`
+
+**For external users:** See `.examples/bk-utils/README.md` for required interfaces and how to implement them.
 
 ## API Endpoints
 
