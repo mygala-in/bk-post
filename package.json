@@ -1,8 +1,8 @@
 {
-  "name": "wedstage-bk-timeline",
+  "name": "mygala-bk-post",
   "version": "1.0.0",
-  "description": "manage timeline for wedstage users, weddings, etc.",
-  "main": "timelineHandler.js",
+  "description": "Serverless backend service for managing posts, likes, and comments for MyGala occasions",
+  "main": "handler.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "node_modules/eslint/bin/eslint.js .",
@@ -12,9 +12,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/app-wedstage/bk-timeline.git"
+    "url": "https://github.com/mygala-in/bk-post.git"
   },
-  "author": "ksAvinash",
+  "author": "MyGala Team",
   "license": "ISC",
   "devDependencies": {
     "aws-sdk": "^2.925.0",
