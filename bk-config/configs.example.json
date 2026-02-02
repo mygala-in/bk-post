@@ -1,0 +1,10 @@
+{
+  "envPrefix": "your-environment-prefix",
+  "awsRegion": "ap-south-1",
+  "awsAccountId": "YOUR_AWS_ACCOUNT_ID",
+  "securityGroup": "sg-xxxxxxxxxxxxxxxxx",
+  "subnet1": "subnet-xxxxxxxxxxxxxxxxx",
+  "subnet2": "subnet-xxxxxxxxxxxxxxxxx",
+  "subnet3": "subnet-xxxxxxxxxxxxxxxxx",
+  "lambdaRole": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/YOUR_LAMBDA_ROLE"
+}

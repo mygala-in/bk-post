@@ -1,8 +1,0 @@
-[submodule "bk-config"]
-	path = bk-config
-	url = https://github.com/gala-in/bk-config.git
-  	branch = dev
-[submodule "bk-utils"]
-	path = bk-utils
-	url = https://github.com/gala-in/bk-utils.git
-  	branch = dev
