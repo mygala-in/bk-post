@@ -2,6 +2,9 @@
 node_modules
 jspm_packages
 
+# SAM build artifacts
+.aws-sam/
+
 # Serverless directories
 .serverless
 package-lock.json

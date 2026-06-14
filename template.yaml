@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: mygala bk-post APIs on AWS SAM
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+    Default: dev
+  EnvPrefix:
+    Type: String
+  AwsRegion:
+    Type: String
+  AwsAccountId:
+    Type: String
+  LambdaRoleArn:
+    Type: String
+  FirebaseApp:
+    Type: String
+  RdsDB:
+    Type: String
+  RdsUser:
+    Type: String
+  RdsPassword:
+    Type: String
+  RdsHost:
+    Type: String
+  JwtSecretKey:
+    Type: String
+  YoutubeApiKey:
+    Type: String
+  GeocodingApiKey:
+    Type: String
+  DynamicLinksKey:
+    Type: String
+  AssetsBucket:
+    Type: String
+  PublicAssetsBucket:
+    Type: String
+  AssetsCloudFront:
+    Type: String
+  IosPackageName:
+    Type: String
+  IosAppStoreId:
+    Type: String
+  AndroidPackageName:
+    Type: String
+  ApiUrl:
+    Type: String
+  AssetsUrl:
+    Type: String
+  WebUrl:
+    Type: String
+  RedisHost:
+    Type: String
+  RedisPassword:
+    Type: String
+    Default: ''
+  RedisPort:
+    Type: Number
+  SpreadSheetId:
+    Type: String
+  AwsNodeJsConnectionReuseEnabled:
+    Type: Number
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 12
+    CodeUri: .
+    Environment:
+      Variables:
+        stage: !Ref Stage
+        awsRegion: !Ref AwsRegion
+        envPrefix: !Ref EnvPrefix
+        awsAccountId: !Ref AwsAccountId
+        firebaseApp: !Ref FirebaseApp
+        rdsDB: !Ref RdsDB
+        rdsUser: !Ref RdsUser
+        rdsPassword: !Ref RdsPassword
+        rdsHost: !Ref RdsHost
+        jwtSecretKey: !Ref JwtSecretKey
+        youtubeApiKey: !Ref YoutubeApiKey
+        geocodingApiKey: !Ref GeocodingApiKey
+        dynamicLinksKey: !Ref DynamicLinksKey
+        assetsBucket: !Ref AssetsBucket
+        publicAssetsBucket: !Ref PublicAssetsBucket
+        assetsCloudFront: !Ref AssetsCloudFront
+        iosPackageName: !Ref IosPackageName
+        iosAppStoreId: !Ref IosAppStoreId
+        androidPackageName: !Ref AndroidPackageName
+        apiUrl: !Ref ApiUrl
+        assetsUrl: !Ref AssetsUrl
+        webUrl: !Ref WebUrl
+        redisHost: !Ref RedisHost
+        redisPassword: !Ref RedisPassword
+        redisPort: !Ref RedisPort
+        spreadSheetId: !Ref SpreadSheetId
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: !Ref AwsNodeJsConnectionReuseEnabled
+
+Resources:
+  PostApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub '${EnvPrefix}-post-api'
+      StageName: !Ref Stage
+      EndpointConfiguration: REGIONAL
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'platform,appversion,Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent,X-Firebase-AppCheck'"
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+
+  PostBgTasksSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${EnvPrefix}-post-bg-tasks'
+
+  PostApisFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub '${EnvPrefix}-post-apis'
+      Handler: handler.invoke
+      Role: !Ref LambdaRoleArn
+      Events:
+        GetOccasionPosts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/list
+            Method: get
+        NewPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/new
+            Method: post
+        PostById:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}
+            Method: ANY
+        PostLike:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/like
+            Method: ANY
+        PostComment:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/comment
+            Method: ANY
+        GetPostLikes:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/likes
+            Method: get
+        GetPostComments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/comments
+            Method: get
+        GetOccasionRecentPosts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PostApi
+            Path: /v1/{id}/recent/list
+            Method: get
+
+  PostBgTasksFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub '${EnvPrefix}-post-bg-tasks'
+      Handler: processor.sns
+      Role: !Ref LambdaRoleArn
+      Timeout: 60
+      Events:
+        PostBgTasksSNSEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref PostBgTasksSNSTopic
+
+Outputs:
+  PostApiId:
+    Description: API Gateway REST API Id
+    Value: !Ref PostApi
+  PostApiUrl:
+    Description: Execute API base URL for the deployed stage
+    Value: !Sub 'https://${PostApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'

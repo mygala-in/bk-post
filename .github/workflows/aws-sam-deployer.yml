@@ -1,0 +1,20 @@
+name: AWS SAM Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    uses:
+      mygala-in/gh-workflows/.github/workflows/aws-sam-deployer.yml@main
+    with:
+      repo-name: ${{ github.event.repository.name }}
+    secrets: inherit
