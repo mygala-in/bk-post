@@ -99,6 +99,7 @@ Globals:
         redisPort: !Ref RedisPort
         spreadSheetId: !Ref SpreadSheetId
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: !Ref AwsNodeJsConnectionReuseEnabled
+        SERVICE_NAME: post
 
 Resources:
   PostApi:
